@@ -9,7 +9,7 @@ import { normalizeReelUrl } from '@/lib/instagram/normalize-url'
 
 export const runtime = 'nodejs'
 
-const SORTS: ReelSort[] = ['date', 'views', 'added']
+const SORTS: ReelSort[] = ['date', 'views', 'added', 'growth']
 
 /** Лента своих рилсов. */
 export async function GET(request: Request) {
