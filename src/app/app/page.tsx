@@ -1,8 +1,13 @@
+import type { Metadata } from 'next'
 import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { db, users } from '@/db'
 import { requireSession } from '@/lib/auth/require-session'
 import { LogoutButton } from './logout-button'
+
+export const metadata: Metadata = {
+  title: 'Кабинет',
+}
 
 /**
  * Заглушка кабинета. Настоящий дашборд — срез 6.
