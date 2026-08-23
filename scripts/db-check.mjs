@@ -36,8 +36,16 @@ for (const [name, url, note] of targets) {
   const shouldBePooled = name === 'DATABASE_URL'
   if (pooled !== shouldBePooled) {
     console.log(
-      `   ⚠️  ожидался хост ${shouldBePooled ? 'С "-pooler"' : 'БЕЗ "-pooler"'}, а тут наоборот`,
+      `   ❌ ожидался хост ${shouldBePooled ? 'С "-pooler"' : 'БЕЗ "-pooler"'}, а тут наоборот`,
     )
+    console.log(
+      shouldBePooled
+        ? '      Без пулера serverless-функции исчерпают лимит соединений.'
+        : '      Через transaction-пулер миграции drizzle-kit ведут себя непредсказуемо.',
+    )
+    // Соединение при этом установится, но назначение строки неверное —
+    // это ошибка, а не замечание. Иначе итог был бы зелёным при явной проблеме.
+    failed = true
   }
 
   const sql = postgres(url, { prepare: false, connect_timeout: 15 })
