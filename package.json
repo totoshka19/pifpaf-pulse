@@ -15,7 +15,8 @@
     "db:check": "node --env-file=.env.local scripts/db-check.mjs",
     "db:verify": "node --env-file=.env.local scripts/db-verify-constraints.mjs",
     "test:db": "vitest run --config vitest.integration.mts",
-    "e2e:reels": "node scripts/e2e-reels.mjs"
+    "e2e:reels": "node scripts/e2e-reels.mjs",
+    "verify:live": "node scripts/verify-live-apify.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
