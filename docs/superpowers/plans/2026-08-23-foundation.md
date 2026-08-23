@@ -39,19 +39,19 @@ Tailwind, Vitest.
       скачать JSON, положить в `fixtures/apify/` — понадобится в задаче 3.
       **Блокирует шаг 5 задачи 3.** Взять хотя бы один рилс с закрытыми лайками,
       чтобы в выгрузку попал случай `likesCount: -1`.
-- [ ] Создать проект в Neon, получить `DATABASE_URL`. **Блокирует задачу 4.**
+- [x] Создать проект в Neon, получить `DATABASE_URL`. Готово: `pifpaf-pulse`, PostgreSQL 18.6, Frankfurt.
 - [ ] Задеплоить пустой Next.js на Vercel и **открыть с телефона на мобильном
       интернете без VPN**. Это блокирующая проверка: если не открывается, площадку
       меняем сейчас, а не на двадцатом экране.
 
 ---
 
-## Статус: выполнены задачи 1, 2, 3, 5, 8
+## Статус: выполнены задачи 1, 2, 3, 4, 5, 8
 
 `npm test` → **49 passed, 1 skipped**. `npm run build` → проходит.
 Коммиты: `2a40690`, `9c4ccd7`, `5b7812b`, `3f0ada0`, и guard владения.
 
-Осталось: **4** (нужен `DATABASE_URL`), **6** и **7** (зависят от 4),
+Осталось: **6** и **7** (регистрация, вход, защита `/app`),
 шаг 5 задачи 3 (нужны фикстуры Apify).
 
 ### Отклонения от плана — что и почему
@@ -69,6 +69,23 @@ Tailwind, Vitest.
 | Тесты сессий: 3 | **10** | Добавлены: подпись чужим ключом, протухший токен, `alg: none`, токен без `sub`, неизвестная роль, отсутствующая роль. |
 | Тесты владения: 3 | **6** | Добавлены: сохранение ссылки на объект, неразличимость чужого и несуществующего по тексту ошибки, отсутствие обхода для роли `admin`. |
 | Задача 8, шаг 5 (деплой) | **Заблокирован** | Remote не настроен, прод не поднят; проверяет регистрацию и редирект из задач 6–7. |
+| Задача 4: схема как в `PLAN.md` §8 | **+5 `CHECK`-ограничений** | `text(..., { enum: [...] })` в Drizzle — подсказка только для TypeScript, в SQL из неё не попадает ничего. База принимала бы `role = 'superadmin'`. Добавлены `ck_users_role`, `ck_reels_sync_status`, `ck_sync_runs_status`, `ck_apify_usage_period`, `ck_apify_usage_results`, `ck_snapshots_non_negative`. |
+| Задача 4: `drizzle.config.ts` читает `DATABASE_URL` | Читает **`DATABASE_URL_UNPOOLED`** | Миграции нужно гонять мимо PgBouncer: drizzle-kit берёт advisory-локи и многошаговый DDL. Файл сам подгружает `.env.local` через `process.loadEnvFile` — drizzle-kit этого не делает. |
+
+### Проверка ограничений БД на зубы
+
+`npm run db:verify` — [scripts/db-verify-constraints.mjs](../../../scripts/db-verify-constraints.mjs).
+Пытается вставить негодные данные и убеждается, что база отвергает; всё внутри
+транзакции с откатом, строк не остаётся.
+
+| Попытка | Результат |
+|---|---|
+| `users.role = 'superadmin'` | ✅ отвергнуто `ck_users_role` |
+| `apify_usage.period = '2026-8'` | ✅ отвергнуто `ck_apify_usage_period` |
+| `apify_usage.results = -5` | ✅ отвергнуто `ck_apify_usage_results` |
+| `reels.sync_status = 'weird'` | ✅ отвергнуто `ck_reels_sync_status` |
+| `reel_snapshots.views = -1` | ✅ отвергнуто `ck_snapshots_non_negative` |
+| `role='admin'`, `period='2026-08'` | ✅ приняты — ограничения не мешают валидному |
 
 ### Проверка тестов на зубы
 
@@ -502,7 +519,7 @@ git add src/lib/instagram fixtures && git commit -m "feat: normalize apify datas
 
 ---
 
-### Задача 4: Схема БД и миграции
+### ✅ Задача 4: Схема БД и миграции
 
 **Файлы:**
 - Создать: `src/db/schema.ts`, `src/db/index.ts`, `drizzle.config.ts`
@@ -512,7 +529,7 @@ git add src/lib/instagram fixtures && git commit -m "feat: normalize apify datas
 - Отдаёт наружу: `db` (клиент Drizzle), таблицы `users`, `reels`, `reelSnapshots`,
   `reelThumbnails`, `syncRuns`, `apifyUsage`. Используется всеми последующими задачами.
 
-- [ ] **Шаг 1: Описать схему**
+- [x] **Шаг 1: Описать схему**
 
 `src/db/schema.ts`:
 
@@ -604,7 +621,7 @@ export const apifyUsage = pgTable('apify_usage', {
 })
 ```
 
-- [ ] **Шаг 1b: Клиент БД**
+- [x] **Шаг 1b: Клиент БД**
 
 `src/db/index.ts`:
 
@@ -620,7 +637,7 @@ export const db = drizzle(client, { schema })
 export * from './schema'
 ```
 
-- [ ] **Шаг 2: Настроить `drizzle.config.ts`**
+- [x] **Шаг 2: Настроить `drizzle.config.ts`**
 
 ```ts
 import { defineConfig } from 'drizzle-kit'
@@ -633,13 +650,13 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Шаг 3: Сгенерировать и применить миграцию**
+- [x] **Шаг 3: Сгенерировать и применить миграцию**
 
 ```bash
 npx drizzle-kit generate && npx drizzle-kit migrate
 ```
 
-- [ ] **Шаг 4: Проверить, что таблицы создались**
+- [x] **Шаг 4: Проверить, что таблицы создались**
 
 ```bash
 npx drizzle-kit studio
@@ -647,7 +664,7 @@ npx drizzle-kit studio
 
 Ожидаем: шесть таблиц, `reels` содержит `next_sync_at` и `last_synced_at`.
 
-- [ ] **Шаг 5: Коммит**
+- [x] **Шаг 5: Коммит**
 
 ```bash
 git add src/db drizzle.config.ts && git commit -m "feat: database schema and migrations"
