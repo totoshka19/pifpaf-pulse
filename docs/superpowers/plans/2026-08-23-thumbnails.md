@@ -39,10 +39,24 @@
 > Хотлинк Instagram блокирует по заголовку `Referer`, который браузер шлёт, а серверный
 > `fetch` — нет. Поэтому обходных манёвров с `User-Agent` не потребовалось.
 
-## Статус: задачи 1–2 выполнены
+## Статус: задачи 1–5 выполнены
 
-`npm test` → **133 passed** (было 109). `npm run test:db` → **24 passed** (было 21).
-`npm run build` → проходит. Коммиты `259ae16`, `6b6046b`.
+`npm test` → **133 passed** (было 109). `npm run test:db` → **34 passed** (было 21).
+`npm run e2e:thumbnails` → **14 проверок** на дев-сервере.
+`npm run build` → проходит. Коммиты `259ae16`, `6b6046b`, `61ea629`.
+
+### Сквозная проверка обложек (`npm run e2e:thumbnails`)
+
+| Что | Результат |
+|---|---|
+| Отдача обложки | `200`, `image/webp` |
+| Сигнатура файла | настоящий `RIFF....WEBP`, а не переименованный JPEG |
+| Вес | **70 КБ вместо ~330 КБ оригинала** |
+| Заголовок кеша | `private, max-age=31536000, immutable` |
+| Гостю | `401` |
+| Чужому | `404`, неотличимо от несуществующего |
+| Повторный запрос | та же картинка байт в байт |
+| Удаление рилса | обложка уходит каскадом, `404` |
 
 ### Отклонения от плана
 
@@ -376,7 +390,7 @@ git add src/lib/images && git commit -m "feat: guarded image download"
 
 ---
 
-### Задача 3: Хранение и `ensureThumbnail`
+### ✅ Задача 3: Хранение и `ensureThumbnail`
 
 **Файлы:**
 - Создать: `src/db/queries/thumbnails.ts`
@@ -392,7 +406,7 @@ git add src/lib/images && git commit -m "feat: guarded image download"
   `ensureThumbnail` идемпотентна: повторный вызов не перекачивает.
   Используется задачами 4, 5 и срезом 7.
 
-- [ ] **Шаг 1: Реализовать**
+- [x] **Шаг 1: Реализовать**
 
 ```ts
 import { eq } from 'drizzle-orm'
@@ -457,7 +471,7 @@ export async function readThumbnail(reelId: string) {
 }
 ```
 
-- [ ] **Шаг 2: Написать интеграционный тест**
+- [x] **Шаг 2: Написать интеграционный тест**
 
 `src/db/queries/thumbnails.integration.test.ts` — на живой базе, по образцу
 `ingest.integration.test.ts`. Случаи:
@@ -473,9 +487,9 @@ export async function readThumbnail(reelId: string) {
 > Случай 4 — ключевой. Ссылки Instagram протухают, и к моменту дозаливки часть
 > из них будет мертва. Функция обязана это переживать молча.
 
-- [ ] **Шаг 3: Прогнать** — `npm run test:db`
+- [x] **Шаг 3: Прогнать** — `npm run test:db`
 
-- [ ] **Шаг 4: Коммит**
+- [x] **Шаг 4: Коммит**
 
 ```bash
 git add src/db/queries && git commit -m "feat: store thumbnails in postgres"
@@ -483,7 +497,7 @@ git add src/db/queries && git commit -m "feat: store thumbnails in postgres"
 
 ---
 
-### Задача 4: Отдача обложки
+### ✅ Задача 4: Отдача обложки
 
 **Файлы:**
 - Создать: `src/app/api/thumbnails/[id]/route.ts`
@@ -491,7 +505,7 @@ git add src/db/queries && git commit -m "feat: store thumbnails in postgres"
 **Интерфейсы:**
 - Отдаёт наружу: `GET /api/thumbnails/{reelId}` → `image/webp`.
 
-- [ ] **Шаг 1: Реализовать**
+- [x] **Шаг 1: Реализовать**
 
 ```ts
 import { eq } from 'drizzle-orm'
@@ -536,7 +550,7 @@ export async function GET(_request: Request, { params }: RouteContext<'/api/thum
 }
 ```
 
-- [ ] **Шаг 2: Подключить к приёму**
+- [x] **Шаг 2: Подключить к приёму**
 
 В `src/app/api/reels/[id]/route.ts`, после успешного `ingestReel`:
 
@@ -546,12 +560,12 @@ export async function GET(_request: Request, { params }: RouteContext<'/api/thum
 await ensureThumbnail(reelId).catch(() => {})
 ```
 
-- [ ] **Шаг 3: Проверить руками**
+- [x] **Шаг 3: Проверить руками**
 
 Добавить рилс, дождаться `ok`, открыть `/api/thumbnails/{id}` в браузере.
 Ожидаем картинку. Затем открыть тот же адрес в инкогнито — ожидаем `401`.
 
-- [ ] **Шаг 4: Коммит**
+- [x] **Шаг 4: Коммит**
 
 ```bash
 git add src/app/api && git commit -m "feat: serve cached thumbnails from our domain"
@@ -559,7 +573,7 @@ git add src/app/api && git commit -m "feat: serve cached thumbnails from our dom
 
 ---
 
-### Задача 5: Компонент `<ReelCover>`
+### ✅ Задача 5: Компонент `<ReelCover>`
 
 **Файлы:**
 - Создать: `src/components/reel-cover.tsx`
@@ -568,7 +582,7 @@ git add src/app/api && git commit -m "feat: serve cached thumbnails from our dom
 - Отдаёт наружу: `<ReelCover reelId author caption />`.
   Используется срезом 5 (лента) и срезом 6 (карточка).
 
-- [ ] **Шаг 1: Реализовать**
+- [x] **Шаг 1: Реализовать**
 
 Клиентский компонент. Поведение:
 
@@ -617,7 +631,7 @@ export function ReelCover({ reelId, author, caption }: Props) {
 }
 ```
 
-- [ ] **Шаг 2: Коммит**
+- [x] **Шаг 2: Коммит**
 
 ```bash
 git add src/components && git commit -m "feat: reel cover with graceful placeholder"
