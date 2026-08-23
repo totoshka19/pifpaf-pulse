@@ -46,13 +46,33 @@ Tailwind, Vitest.
 
 ---
 
-## Статус: выполнены задачи 1, 2, 3, 4, 5, 8
+## Статус: срез закрыт — все 8 задач выполнены
 
-`npm test` → **49 passed, 1 skipped**. `npm run build` → проходит.
-Коммиты: `2a40690`, `9c4ccd7`, `5b7812b`, `3f0ada0`, и guard владения.
+`npm test` → **60 passed, 1 skipped**. `npm run build` → проходит.
+Схема применена к живой базе Neon, поток «регистрация → вход → кабинет → выход»
+проверен на дев-сервере.
 
-Осталось: **6** и **7** (регистрация, вход, защита `/app`),
-шаг 5 задачи 3 (нужны фикстуры Apify).
+Не закрыто и ждёт человека:
+- шаг 5 задачи 3 — нужны выгрузки Apify в `fixtures/apify/`;
+- деплой и проверка с телефона — предусловие, не выполнено.
+
+### Живая проверка потока аутентификации
+
+| Что | Результат |
+|---|---|
+| Гость открывает `/app` | `307` → `/login?next=%2Fapp` |
+| Регистрация | `201` + `Set-Cookie: pp_session=…; HttpOnly; SameSite=lax; Max-Age=2592000` |
+| Email нормализуется | ввод `Test.Blogger@Example.RU` → в базе `test.blogger@example.ru` |
+| `/app` с кукой | отдаёт имя и почту владельца |
+| Неверный пароль | `401 {"error":"Неверный email или пароль"}` |
+| Неизвестный email | `401` — **тело ответа побайтово то же** |
+| Разница во времени между ними | **5 мс** по медиане из 12 замеров после прогрева |
+| Повторная регистрация | `409 Такой email уже зарегистрирован` |
+| Пароль в 37 кириллических символов | `400 Пароль слишком длинный` (74 байта > 72) |
+| Пароль в 5 символов | `400 Пароль короче 8 символов` |
+| Кривой email | `400 Проверь email — кажется, в нём опечатка` |
+
+Тестовые пользователи из базы удалены, в `users` ноль строк.
 
 ### Отклонения от плана — что и почему
 
@@ -71,6 +91,9 @@ Tailwind, Vitest.
 | Задача 8, шаг 5 (деплой) | **Заблокирован** | Remote не настроен, прод не поднят; проверяет регистрацию и редирект из задач 6–7. |
 | Задача 4: схема как в `PLAN.md` §8 | **+5 `CHECK`-ограничений** | `text(..., { enum: [...] })` в Drizzle — подсказка только для TypeScript, в SQL из неё не попадает ничего. База принимала бы `role = 'superadmin'`. Добавлены `ck_users_role`, `ck_reels_sync_status`, `ck_sync_runs_status`, `ck_apify_usage_period`, `ck_apify_usage_results`, `ck_snapshots_non_negative`. |
 | Задача 4: `drizzle.config.ts` читает `DATABASE_URL` | Читает **`DATABASE_URL_UNPOOLED`** | Миграции нужно гонять мимо PgBouncer: drizzle-kit берёт advisory-локи и многошаговый DDL. Файл сам подгружает `.env.local` через `process.loadEnvFile` — drizzle-kit этого не делает. |
+| Задача 6: `password.ts` — обёртки над bcrypt | **+ `validatePassword` с лимитом в БАЙТАХ** | bcrypt молча обрезает вход на 72 байтах: два разных пароля с общими первыми 72 байтами проходят одним хешом. Кириллица в UTF-8 — 2 байта на символ, то есть лимит наступает на **36 символах**, что для парольной фразы достижимо. Проверка через `Buffer.byteLength`, а не `.length`. |
+| Задача 6: `login` возвращает 401 при `!user` | **+ холостой bcrypt на заглушечном хеше** | Одинакового текста ошибки мало: без bcrypt ветка «нет такого email» отвечала мгновенно, а «пароль неверный» — через ~200 мс. По этой разнице email перебирается секундомером. После правки разница 5 мс. |
+| Задача 7: только `src/app/app/page.tsx` | **+ `src/app/login/page.tsx`** и `logout-button.tsx` | `proxy.ts` редиректит на `/login`, которого в плане не было — без него редирект вёл бы в 404 и поток нельзя было бы проверить. Экраны рабочие, но без дизайна: оформление идёт срезом 8. |
 
 ### Проверка ограничений БД на зубы
 
@@ -778,7 +801,7 @@ git add src/lib/auth && git commit -m "feat: jwt sessions via jose"
 
 ---
 
-### Задача 6: Роуты регистрации и входа
+### ✅ Задача 6: Роуты регистрации и входа
 
 **Файлы:**
 - Создать: `src/app/api/auth/register/route.ts`, `src/app/api/auth/login/route.ts`,
@@ -790,7 +813,7 @@ git add src/lib/auth && git commit -m "feat: jwt sessions via jose"
 - Отдаёт наружу: `SESSION_COOKIE = 'pp_session'`, хелперы `setSessionCookie(response, token)`
   и `clearSessionCookie(response)`. Используются задачей 7 и срезом 9 (демо-вход).
 
-- [ ] **Шаг 1: Пароли**
+- [x] **Шаг 1: Пароли**
 
 `src/lib/auth/password.ts`:
 
@@ -810,7 +833,7 @@ export function verifyPassword(plain: string, hash: string): Promise<boolean> {
 }
 ```
 
-- [ ] **Шаг 2: Cookie**
+- [x] **Шаг 2: Cookie**
 
 `src/lib/auth/cookie.ts`:
 
@@ -844,7 +867,7 @@ export function clearSessionCookie(response: NextResponse): NextResponse {
 }
 ```
 
-- [ ] **Шаг 3: `POST /api/auth/register`**
+- [x] **Шаг 3: `POST /api/auth/register`**
 
 `src/app/api/auth/register/route.ts`:
 
@@ -891,7 +914,7 @@ export async function POST(request: Request) {
 }
 ```
 
-- [ ] **Шаг 4: `POST /api/auth/login`**
+- [x] **Шаг 4: `POST /api/auth/login`**
 
 `src/app/api/auth/login/route.ts` — та же структура, но:
 
@@ -910,7 +933,7 @@ const token = await signSession({ userId: user.id, role: user.role })
 return setSessionCookie(NextResponse.json({ ok: true }), token)
 ```
 
-- [ ] **Шаг 5: `POST /api/auth/logout`**
+- [x] **Шаг 5: `POST /api/auth/logout`**
 
 ```ts
 import { NextResponse } from 'next/server'
@@ -921,7 +944,7 @@ export async function POST() {
 }
 ```
 
-- [ ] **Шаг 6: Проверить руками**
+- [x] **Шаг 6: Проверить руками**
 
 ```bash
 curl -i -X POST localhost:3000/api/auth/register -H 'content-type: application/json' -d '{"email":"a@b.ru","password":"12345678","displayName":"Тест"}'
@@ -929,7 +952,7 @@ curl -i -X POST localhost:3000/api/auth/register -H 'content-type: application/j
 
 Ожидаем: 201 и заголовок `Set-Cookie: pp_session=...; HttpOnly`.
 
-- [ ] **Шаг 7: Коммит**
+- [x] **Шаг 7: Коммит**
 
 ```bash
 git add src/app/api/auth src/lib/auth && git commit -m "feat: register, login and logout endpoints"
@@ -937,7 +960,7 @@ git add src/app/api/auth src/lib/auth && git commit -m "feat: register, login an
 
 ---
 
-### Задача 7: Proxy и защита `/app`
+### ✅ Задача 7: Proxy и защита `/app`
 
 > **В Next.js 16 `middleware.ts` устарел и переименован в `proxy.ts`**, экспорт
 > функции — `proxy`. Проверено по `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`.
@@ -954,7 +977,7 @@ git add src/app/api/auth src/lib/auth && git commit -m "feat: register, login an
 - Отдаёт наружу: `requireSession(): Promise<Session>` — бросает 401 в route handlers.
   Используется всеми эндпоинтами данных в срезах 3–7.
 
-- [ ] **Шаг 1: Написать proxy**
+- [x] **Шаг 1: Написать proxy**
 
 `src/proxy.ts`:
 
@@ -978,19 +1001,19 @@ export async function proxy(request: NextRequest) {
 export const config = { matcher: ['/app/:path*'] }
 ```
 
-- [ ] **Шаг 2: Проверить сборку**
+- [x] **Шаг 2: Проверить сборку**
 
 Запустить `npm run build`.
 Ожидаем: сборка проходит, в выводе нет предупреждения про устаревший `middleware`.
 
-- [ ] **Шаг 3: Проверить редирект**
+- [x] **Шаг 3: Проверить редирект**
 
 Открыть `/app` в инкогнито.
 Ожидаем: редирект на `/login?next=/app`.
 Отдельно открыть любую страницу и убедиться, что стили и скрипты загрузились —
 это проверка матчера из шага 1.
 
-- [ ] **Шаг 4: Коммит**
+- [x] **Шаг 4: Коммит**
 
 ```bash
 git add src/proxy.ts src/lib/auth src/app/app && git commit -m "feat: protect /app via proxy"
@@ -1085,9 +1108,12 @@ Remote не настроен, прод не поднят. Выполняется
 
 Срез считается закрытым, когда одновременно верно:
 
-- [x] `npm test` — зелёный, покрыты нормализация URL, метрик, сессии и владение
+- [x] `npm test` — зелёный, покрыты нормализация URL, метрик, пароли, сессии и владение
 - [x] `npm run build` — проходит без ошибок
-- [ ] На проде можно зарегистрироваться и попасть в `/app` — нужны задачи 4, 6
-- [ ] `/app` под гостем редиректит на `/login` — нужна задача 7
-- [ ] Прод открывается **с телефона, с мобильного интернета, без VPN** — предусловие
+- [x] Можно зарегистрироваться и попасть в `/app` — **локально**
+- [x] `/app` под гостем редиректит на `/login` — проверено, `307` с `?next=%2Fapp`
+- [ ] Прод открывается **с телефона, с мобильного интернета, без VPN** — не задеплоено
 - [x] Ни одного живого вызова Apify — кредиты нетронуты
+
+Единственное, что отделяет срез от полного закрытия, — деплой. Он в предусловиях,
+потому что требует доступа к аккаунту Vercel.
