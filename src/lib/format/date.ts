@@ -34,7 +34,10 @@ type Parts = { year: number; month: number; day: number; hour: number; minute: n
  * порядок и разделители зависят от локали, а типы — нет.
  *
  * `hourCycle: 'h23'`, а не `hour12: false`: последний в локали en-US
- * исторически отдаёт «24» для полуночи, и дата уезжает на сутки.
+ * исторически отдавал «24» для полуночи, и дата уезжала на сутки. На текущей
+ * сборке Node/ICU это уже не воспроизводится — проверено мутацией 2026-08-24.
+ * `h23` оставлен осознанно: он явный и не зависит от того, как конкретная
+ * сборка ICU трактует `hour12`.
  */
 function partsIn(date: Date, timeZone: string): Parts {
   const parts = new Intl.DateTimeFormat('en-US', {
