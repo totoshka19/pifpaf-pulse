@@ -721,6 +721,7 @@ POST   /api/apify/webhook      защищён секретом в query
 > готовы. Основной площадкой стал **Netlify**.
 
 **Основной вариант: Netlify + Neon.** Бесплатно, поддомен `*.netlify.app` сразу.
+Боевой адрес: **https://iridescent-biscuit-442fa5.netlify.app**
 Домен не покупаем.
 
 Почему именно он из оставшихся: Next.js 16 поддержан из коробки через OpenNext-адаптер,
