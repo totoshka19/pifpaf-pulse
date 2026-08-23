@@ -37,14 +37,40 @@ Tailwind, Vitest.
 
 - [ ] Прогнать `apify/instagram-scraper` в консоли Apify на 3–5 реальных ссылках,
       скачать JSON, положить в `fixtures/apify/` — понадобится в задаче 3.
-- [ ] Создать проект в Neon, получить `DATABASE_URL`.
+      **Блокирует шаг 5 задачи 3.** Взять хотя бы один рилс с закрытыми лайками,
+      чтобы в выгрузку попал случай `likesCount: -1`.
+- [ ] Создать проект в Neon, получить `DATABASE_URL`. **Блокирует задачу 4.**
 - [ ] Задеплоить пустой Next.js на Vercel и **открыть с телефона на мобильном
       интернете без VPN**. Это блокирующая проверка: если не открывается, площадку
       меняем сейчас, а не на двадцатом экране.
 
 ---
 
-### Задача 1: Каркас проекта и тестовый харнесс
+## Статус: задачи 1–3 выполнены
+
+`npm test` → **33 passed, 1 skipped**. `npm run build` → проходит.
+Коммиты: `2a40690`, `9c4ccd7`, `5b7812b`.
+
+### Отклонения от плана — что и почему
+
+| Записано в плане | Сделано | Причина |
+|---|---|---|
+| `create-next-app .` в корне | Генерация во временной папке + перенос файлов | Имя папки `PifPaf Pulse` невалидно для npm (пробел, заглавные). Пакет назван `pifpaf-pulse`. |
+| Next.js 15 | **Next.js 16.3.2**, React 19.2.8 | Это отдаёт `create-next-app@latest`. Повлекло правку §4 спеки: `middleware.ts` → `proxy.ts`, Node-рантайм вместо Edge. |
+| `npm i -D @types/bcryptjs` | Не установлен | `bcryptjs` 3.x везёт собственные типы; пакет в DefinitelyTyped стал пустой заглушкой и конфликтует. |
+| `vitest.config.ts` с `__dirname` | **`vitest.config.mts`** с `import.meta.url` | В package.json нет `"type": "module"`, обычный `.ts` грузится как CommonJS — vitest предупреждает о будущей поломке. `.mts` решает локально, без глобального переключения режима модулей. |
+| `src/lib/__tests__/smoke.test.ts` | Создан, проверен, **удалён** | Своё дело сделал. `1 + 1 === 2` в репозитории, который смотрит проверяющий, — шум; настоящие тесты доказывают работоспособность харнесса лучше. |
+| Тесты нормализации URL: 17 | **19** | Добавлены ссылка без слеша на конце и домен-обманка `instagram.com.evil.ru` — наивная проверка через `includes` такую пропустила бы. |
+| Тесты нормализации метрик: 9 | **14** | Добавлены: нечисловой счётчик, нечитаемая дата, пустая подпись, `plays` отдельно от `views`, `null`/строка вместо объекта. |
+| Шаг 5 задачи 3 (прогон на фикстурах) | **Заблокирован** | Нужны выгрузки Apify из предусловий. Тест `src/lib/instagram/fixtures.test.ts` написан заранее и помечается как пропущенный, пока папка пуста — молча зеленеть не будет. |
+
+Дополнительно, сверх плана: в `.gitignore` добавлено исключение `!.env.example`
+(шаблон `.env*` из create-next-app скрыл бы и его), а `AGENTS.md` наполнен
+конвенциями проекта — `CLAUDE.md` его импортирует.
+
+---
+
+### ✅ Задача 1: Каркас проекта и тестовый харнесс
 
 **Файлы:**
 - Создать: `package.json`, `tsconfig.json`, `next.config.ts`, `vitest.config.ts`
@@ -55,20 +81,20 @@ Tailwind, Vitest.
 **Интерфейсы:**
 - Отдаёт наружу: рабочие команды `npm run dev`, `npm run build`, `npm test`.
 
-- [ ] **Шаг 1: Создать проект**
+- [x] **Шаг 1: Создать проект**
 
 ```bash
 npx create-next-app@latest . --typescript --tailwind --app --src-dir --eslint --no-import-alias
 ```
 
-- [ ] **Шаг 2: Поставить зависимости среза**
+- [x] **Шаг 2: Поставить зависимости среза**
 
 ```bash
 npm i drizzle-orm postgres jose bcryptjs
 npm i -D drizzle-kit vitest @types/bcryptjs
 ```
 
-- [ ] **Шаг 3: Настроить Vitest**
+- [x] **Шаг 3: Настроить Vitest**
 
 `vitest.config.ts`:
 
@@ -84,7 +110,7 @@ export default defineConfig({
 
 Добавить в `package.json`: `"test": "vitest run"`, `"test:watch": "vitest"`.
 
-- [ ] **Шаг 4: Написать smoke-тест**
+- [x] **Шаг 4: Написать smoke-тест**
 
 `src/lib/__tests__/smoke.test.ts`:
 
@@ -98,12 +124,12 @@ describe('харнесс', () => {
 })
 ```
 
-- [ ] **Шаг 5: Убедиться, что тесты идут**
+- [x] **Шаг 5: Убедиться, что тесты идут**
 
 Запустить: `npm test`
 Ожидаем: `1 passed`.
 
-- [ ] **Шаг 6: Заполнить `.env.example`**
+- [x] **Шаг 6: Заполнить `.env.example`**
 
 ```
 DATABASE_URL=
@@ -118,7 +144,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 Проверить, что `.env*.local` и `.env` есть в `.gitignore`.
 
-- [ ] **Шаг 7: Коммит**
+- [x] **Шаг 7: Коммит**
 
 ```bash
 git add -A && git commit -m "chore: scaffold next.js project with vitest"
@@ -126,7 +152,7 @@ git add -A && git commit -m "chore: scaffold next.js project with vitest"
 
 ---
 
-### Задача 2: Нормализация ссылки на рилс
+### ✅ Задача 2: Нормализация ссылки на рилс
 
 Первое, что сделает проверяющий, — вставит ссылку, скопированную с телефона.
 Разбор URL — чистая функция без зависимостей, поэтому она идёт до всего остального.
@@ -147,7 +173,7 @@ git add -A && git commit -m "chore: scaffold next.js project with vitest"
   `reason` — готовый к показу русский текст, не код ошибки.
   Используется в задаче среза 3 (`POST /api/reels`).
 
-- [ ] **Шаг 1: Написать падающие тесты**
+- [x] **Шаг 1: Написать падающие тесты**
 
 `src/lib/instagram/normalize-url.test.ts`:
 
@@ -203,12 +229,12 @@ describe('normalizeReelUrl — отклоняет мусор с человече
 })
 ```
 
-- [ ] **Шаг 2: Убедиться, что тесты падают**
+- [x] **Шаг 2: Убедиться, что тесты падают**
 
 Запустить: `npm test -- normalize-url`
 Ожидаем: FAIL, `Failed to resolve import './normalize-url'`.
 
-- [ ] **Шаг 3: Реализовать**
+- [x] **Шаг 3: Реализовать**
 
 `src/lib/instagram/normalize-url.ts`:
 
@@ -263,12 +289,12 @@ export function normalizeReelUrl(input: string): NormalizeResult {
 }
 ```
 
-- [ ] **Шаг 4: Убедиться, что тесты проходят**
+- [x] **Шаг 4: Убедиться, что тесты проходят**
 
 Запустить: `npm test -- normalize-url`
 Ожидаем: `17 passed`.
 
-- [ ] **Шаг 5: Коммит**
+- [x] **Шаг 5: Коммит**
 
 ```bash
 git add src/lib/instagram && git commit -m "feat: normalize instagram reel urls with tests"
@@ -276,7 +302,7 @@ git add src/lib/instagram && git commit -m "feat: normalize instagram reel urls 
 
 ---
 
-### Задача 3: Нормализация ответа Apify
+### ✅ Задача 3: Нормализация ответа Apify
 
 **Файлы:**
 - Создать: `src/lib/instagram/normalize-item.ts`
@@ -305,7 +331,7 @@ git add src/lib/instagram && git commit -m "feat: normalize instagram reel urls 
   ```
   Используется в срезе 3 (запись снапшота) и срезе 4 (скачивание обложки).
 
-- [ ] **Шаг 1: Написать падающие тесты**
+- [x] **Шаг 1: Написать падающие тесты**
 
 `src/lib/instagram/normalize-item.test.ts`:
 
@@ -371,12 +397,12 @@ describe('normalizeApifyItem — разбор полей', () => {
 })
 ```
 
-- [ ] **Шаг 2: Убедиться, что тесты падают**
+- [x] **Шаг 2: Убедиться, что тесты падают**
 
 Запустить: `npm test -- normalize-item`
 Ожидаем: FAIL, модуль не найден.
 
-- [ ] **Шаг 3: Реализовать**
+- [x] **Шаг 3: Реализовать**
 
 `src/lib/instagram/normalize-item.ts`:
 
@@ -441,7 +467,7 @@ export function normalizeApifyItem(item: unknown): ReelData | null {
 }
 ```
 
-- [ ] **Шаг 4: Убедиться, что тесты проходят**
+- [x] **Шаг 4: Убедиться, что тесты проходят**
 
 Запустить: `npm test -- normalize-item`
 Ожидаем: `9 passed`.
