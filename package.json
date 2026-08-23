@@ -13,7 +13,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:check": "node --env-file=.env.local scripts/db-check.mjs",
-    "db:verify": "node --env-file=.env.local scripts/db-verify-constraints.mjs"
+    "db:verify": "node --env-file=.env.local scripts/db-verify-constraints.mjs",
+    "test:db": "vitest run --config vitest.integration.mts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
