@@ -7,13 +7,13 @@
 **Цель:** каркас проекта, покрытые тестами функции нормализации данных, схема БД
 и рабочая аутентификация с изоляцией данных между пользователями.
 
-**Архитектура:** Next.js 15 App Router, единый деплой фронта и бэка. Чистые функции
+**Архитектура:** Next.js 16 App Router, единый деплой фронта и бэка. Чистые функции
 нормализации (URL, метрики Apify) вынесены в `src/lib/` и покрыты юнит-тестами до
 того, как появится первый запрос к внешнему API. Аутентификация — JWT в httpOnly
-cookie: подпись и проверка через `jose` (работает в Edge-middleware), хеш пароля
-через `bcryptjs` (только в Node-роутах).
+cookie: подпись и проверка через `jose` (не зависит от Node API — сохраняет запасной
+деплой на Cloudflare), хеш пароля через `bcryptjs`.
 
-**Стек:** Next.js 15, TypeScript, Drizzle ORM, PostgreSQL (Neon), `jose`, `bcryptjs`,
+**Стек:** Next.js 16, TypeScript, Drizzle ORM, PostgreSQL (Neon), `jose`, `bcryptjs`,
 Tailwind, Vitest.
 
 **Спека:** [`PLAN.md`](../../../PLAN.md) — читать вместе с этим планом.
@@ -24,8 +24,11 @@ Tailwind, Vitest.
 - **Никаких живых вызовов Apify в этом срезе.** Работаем на фикстурах — кредиты
   расходуются только начиная со среза 3.
 - ORM — **Drizzle**, не Prisma. Аналитические запросы — сырым SQL в `src/db/queries/`.
-- JWT — **только `jose`**. `jsonwebtoken` в Edge-runtime не работает.
-- `bcryptjs` **не импортируется** в `middleware.ts`.
+- JWT — **только `jose`**. Не из-за Edge (в Next 16 proxy работает на Node), а чтобы
+  не потерять запасной деплой на Cloudflare Workers. См. `PLAN.md` §4.
+- Перехват запросов — файл **`src/proxy.ts`**, экспорт функции **`proxy`**.
+  `middleware.ts` в Next 16 устарел.
+- `bcryptjs` **не импортируется** в `proxy.ts` — он там не нужен.
 - Тексты интерфейса и сообщения об ошибках — **на русском, на «ты»**.
 - Время в интерфейсе и в группировках — **`Europe/Moscow`**, никогда не UTC.
 - `APIFY_TOKEN` — только серверная переменная, никогда не `NEXT_PUBLIC_*`.
@@ -623,8 +626,9 @@ git add src/db drizzle.config.ts && git commit -m "feat: database schema and mig
   function signSession(session: Session): Promise<string>
   function verifySession(token: string | undefined): Promise<Session | null>
   ```
-  `verifySession` вызывается из `middleware.ts` (Edge) и из route handlers (Node) —
-  поэтому в этом файле **не может быть ни одного импорта из `node:`**.
+  `verifySession` вызывается из `proxy.ts` и из route handlers — поэтому в этом файле
+  **не должно быть ни одного импорта из `node:`**. Формально Next 16 это разрешает,
+  но переносимость на Cloudflare мы теряем сразу и молча.
 
 - [ ] **Шаг 1: Написать падающие тесты**
 
@@ -732,8 +736,8 @@ git add src/lib/auth && git commit -m "feat: jwt sessions via jose"
 `src/lib/auth/password.ts`:
 
 ```ts
-// ВНИМАНИЕ: только Node-runtime. Не импортировать из middleware.ts —
-// bcryptjs утянет за собой node:crypto и сборка Edge упадёт.
+// Только для route handlers. В proxy.ts не импортировать: проверка пароля там
+// не нужна, а лишний вес в перехватчике запросов оплачивается на каждом запросе.
 import bcrypt from 'bcryptjs'
 
 const SALT_ROUNDS = 10
@@ -874,10 +878,15 @@ git add src/app/api/auth src/lib/auth && git commit -m "feat: register, login an
 
 ---
 
-### Задача 7: Middleware и защита `/app`
+### Задача 7: Proxy и защита `/app`
+
+> **В Next.js 16 `middleware.ts` устарел и переименован в `proxy.ts`**, экспорт
+> функции — `proxy`. Проверено по `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`.
+> Proxy по умолчанию исполняется в **Node.js-рантайме**; опция `runtime` в этом файле
+> недоступна и бросает ошибку.
 
 **Файлы:**
-- Создать: `src/middleware.ts`
+- Создать: `src/proxy.ts`
 - Создать: `src/lib/auth/require-session.ts`
 - Создать: `src/app/app/page.tsx` (заглушка «Привет, {имя}»)
 
@@ -886,14 +895,16 @@ git add src/app/api/auth src/lib/auth && git commit -m "feat: register, login an
 - Отдаёт наружу: `requireSession(): Promise<Session>` — бросает 401 в route handlers.
   Используется всеми эндпоинтами данных в срезах 3–7.
 
-- [ ] **Шаг 1: Написать middleware**
+- [ ] **Шаг 1: Написать proxy**
+
+`src/proxy.ts`:
 
 ```ts
 import { NextResponse, type NextRequest } from 'next/server'
 import { SESSION_COOKIE } from '@/lib/auth/cookie'
 import { verifySession } from '@/lib/auth/session'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const session = await verifySession(request.cookies.get(SESSION_COOKIE)?.value)
   if (session) return NextResponse.next()
 
@@ -902,25 +913,28 @@ export async function middleware(request: NextRequest) {
   return NextResponse.redirect(url)
 }
 
+// Матчер обязателен. Без него proxy выполняется на КАЖДОМ запросе, включая
+// _next/static, оптимизацию картинок и public/ — редирект на /login убьёт
+// загрузку собственных CSS и JS.
 export const config = { matcher: ['/app/:path*'] }
 ```
 
-- [ ] **Шаг 2: Проверить, что Edge не падает**
+- [ ] **Шаг 2: Проверить сборку**
 
 Запустить `npm run build`.
-Ожидаем: сборка проходит. Если в консоли появилось `Module not found: Can't resolve 'crypto'` —
-значит в граф импортов middleware просочился Node-модуль (чаще всего `bcryptjs`
-через общий barrel-файл). Разорвать импорт, а не добавлять полифилл.
+Ожидаем: сборка проходит, в выводе нет предупреждения про устаревший `middleware`.
 
 - [ ] **Шаг 3: Проверить редирект**
 
 Открыть `/app` в инкогнито.
 Ожидаем: редирект на `/login?next=/app`.
+Отдельно открыть любую страницу и убедиться, что стили и скрипты загрузились —
+это проверка матчера из шага 1.
 
 - [ ] **Шаг 4: Коммит**
 
 ```bash
-git add src/middleware.ts src/lib/auth src/app/app && git commit -m "feat: protect /app via edge middleware"
+git add src/proxy.ts src/lib/auth src/app/app && git commit -m "feat: protect /app via proxy"
 ```
 
 ---
