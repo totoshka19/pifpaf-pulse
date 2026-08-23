@@ -17,7 +17,9 @@
     "test:db": "vitest run --config vitest.integration.mts",
     "e2e:reels": "node scripts/e2e-reels.mjs",
     "verify:live": "node scripts/verify-live-apify.mjs",
-    "e2e:thumbnails": "node scripts/e2e-thumbnails.mjs"
+    "e2e:thumbnails": "node scripts/e2e-thumbnails.mjs",
+    "verify:prod": "node --env-file=.env.local scripts/verify-prod.mjs",
+    "thumbs:backfill": "tsx --env-file=.env.local scripts/backfill-thumbnails.mts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -38,6 +40,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5",
     "vitest": "^4.1.11"
   }
