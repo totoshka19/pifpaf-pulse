@@ -42,3 +42,8 @@ next-env.d.ts
 
 # но шаблон переменных окружения — коммитим
 !.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
