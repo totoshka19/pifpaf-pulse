@@ -42,7 +42,7 @@ function matches(row: ReelListRow, needle: string): boolean {
     .includes(needle)
 }
 
-/** По убыванию, `null` всегда в конце: «нет данные» не должно занимать верх. */
+/** По убыванию, `null` всегда в конце: «нет данных» не должно занимать верх. */
 function compareDesc(a: number | null, b: number | null): number {
   if (a === b) return 0
   if (a === null) return 1
