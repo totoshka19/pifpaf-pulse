@@ -14,7 +14,8 @@
     "db:studio": "drizzle-kit studio",
     "db:check": "node --env-file=.env.local scripts/db-check.mjs",
     "db:verify": "node --env-file=.env.local scripts/db-verify-constraints.mjs",
-    "test:db": "vitest run --config vitest.integration.mts"
+    "test:db": "vitest run --config vitest.integration.mts",
+    "e2e:reels": "node scripts/e2e-reels.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
