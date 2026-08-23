@@ -140,4 +140,22 @@ describe('applyFeed — сортировка', () => {
 
     expect(rows.map((r) => r.id)).toEqual(before)
   })
+
+  it('null всегда в конце, даже за отрицательными значениями', () => {
+    // null в JavaScript коирует в 0 при арифметике. Без явной обработки
+    // null - 0 = 0 (ничья), а null - (-10) = 10 (положительное), что
+    // отправило бы «нет данных» ВВЕРХ вместо рилса, теряющего просмотры.
+    // Проект требует «нет данных = —, не 0» — эта ветка обязательна.
+    const testRows = [
+      row({ id: 'rising', growth7d: 50, postedAt: ago(1), createdAt: ago(1) }),
+      row({ id: 'noData', growth7d: null, postedAt: ago(1), createdAt: ago(2) }),
+      row({ id: 'declining', growth7d: -10, postedAt: ago(1), createdAt: ago(3) }),
+    ]
+
+    expect(applyFeed(testRows, state({ sort: 'growth' }), NOW).map((r) => r.id)).toEqual([
+      'rising',
+      'declining',
+      'noData',
+    ])
+  })
 })

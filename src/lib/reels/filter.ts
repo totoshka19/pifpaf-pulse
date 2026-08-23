@@ -8,6 +8,11 @@ import type { ReelListRow } from '@/db/queries/list-reels'
  * нажатие клавиши: на free tier это лишняя секунда на ровном месте.
  */
 
+/**
+ * Зеркал `ReelSort` по членам, но это разные типы. `ReelSort` — охранник SQL,
+ * `FeedSort` — состояние браузера. В этом срезе клиент не отправляет сортировку
+ * на сервер, поэтому они свободны разойтись потом (серверная-only или браузер-only).
+ */
 export type FeedSort = 'added' | 'date' | 'views' | 'growth'
 export type FeedRange = 'all' | '7d' | '30d'
 export type FeedView = 'grid' | 'table'
