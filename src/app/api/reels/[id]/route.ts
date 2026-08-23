@@ -1,6 +1,7 @@
 import { asc, desc, eq } from 'drizzle-orm'
 import { db, reels, reelSnapshots, syncRuns } from '@/db'
 import { ingestReel } from '@/db/queries/ingest'
+import { ensureThumbnail } from '@/db/queries/thumbnails'
 import { handleError, ok } from '@/lib/api/respond'
 import { getDatasetItems, getRun } from '@/lib/apify/client'
 import { assertOwned } from '@/lib/auth/ownership'
@@ -64,6 +65,11 @@ async function advanceIfPending(reelId: string): Promise<void> {
     .update(syncRuns)
     .set({ status: 'succeeded', finishedAt: new Date() })
     .where(eq(syncRuns.id, run.id))
+
+  // Обложка — не критичный путь: метрики уже записаны, статус уже `ok`.
+  // Ошибку глотаем: ссылки Instagram протухают, и терять цифры из-за мёртвой
+  // картинки — плохой обмен. Если не вышло, попробуем на следующем заходе.
+  await ensureThumbnail(reelId).catch(() => {})
 }
 
 export async function GET(_request: Request, { params }: RouteContext<'/api/reels/[id]'>) {

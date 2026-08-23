@@ -1,0 +1,62 @@
+'use client'
+
+import { useState } from 'react'
+
+/**
+ * Обложка рилса с honest-плейсхолдером.
+ *
+ * Правило из чек-листа PLAN.md §12: НИКОГДА не показывать сломанную иконку
+ * картинки. Это первое, что бросается в глаза при беглом просмотре ленты,
+ * и один битый квадрат обесценивает впечатление от всех остальных.
+ *
+ * Обложки может не быть штатно: ссылка Instagram протухает за ~4,5 суток,
+ * и рилс, добавленный давно, мог не успеть попасть в дозаливку.
+ */
+
+type Props = {
+  reelId: string
+  author?: string | null
+  caption?: string | null
+  /** Свежие карточки в начале ленты грузим сразу, остальные лениво. */
+  priority?: boolean
+}
+
+export function ReelCover({ reelId, author, caption, priority = false }: Props) {
+  const [broken, setBroken] = useState(false)
+
+  const letter = (author ?? '').trim().charAt(0).toUpperCase() || '?'
+  const alt = caption?.trim()
+    ? caption.trim().slice(0, 80)
+    : author
+      ? `Рилс автора ${author}`
+      : 'Обложка рилса'
+
+  return (
+    <div className="relative aspect-9/16 w-full overflow-hidden rounded-[var(--radius)] bg-[#dbe4f5]">
+      {broken ? (
+        <div
+          className="flex h-full w-full items-center justify-center bg-linear-to-br from-[#c7d7ff] to-[#eef4ff]"
+          role="img"
+          aria-label={author ? `Обложка недоступна, автор ${author}` : 'Обложка недоступна'}
+        >
+          <span className="text-5xl font-semibold text-[var(--ink)]/30 select-none">
+            {letter}
+          </span>
+        </div>
+      ) : (
+        // Обычный img, а не next/image: картинка уже нормализована нами —
+        // ровно один размер и ровно один формат. Слой оптимизации поверх
+        // добавил бы обработку и привязку к возможностям площадки, не дав
+        // ничего взамен.
+        <img
+          src={`/api/thumbnails/${reelId}`}
+          alt={alt}
+          loading={priority ? 'eager' : 'lazy'}
+          decoding="async"
+          className="h-full w-full object-cover"
+          onError={() => setBroken(true)}
+        />
+      )}
+    </div>
+  )
+}
