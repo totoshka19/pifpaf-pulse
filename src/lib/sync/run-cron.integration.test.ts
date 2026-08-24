@@ -2,7 +2,13 @@ import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { db, reels, syncRuns, users } from '@/db'
 import { readThumbnail } from '@/db/queries/thumbnails'
-import { collectFinishedRuns, FAILED_RETRY_MS, STUCK_RUN_MS, THUMBNAILS_PER_TICK } from './run-cron'
+import {
+  collectFinishedRuns,
+  FAILED_RETRY_MS,
+  runCronTick,
+  STUCK_RUN_MS,
+  THUMBNAILS_PER_TICK,
+} from './run-cron'
 
 /**
  * Фаза 1 крона на ЖИВОЙ базе и МОКЕ Apify.
@@ -354,5 +360,85 @@ describe('collectFinishedRuns — лимит попыток на обложку 
       if (await readThumbnail(reelId)) stored++
     }
     expect(stored).toBeLessThanOrEqual(THUMBNAILS_PER_TICK)
+  })
+})
+
+describe('runCronTick — фаза запуска', () => {
+  async function seedDue(code: string, minutesOverdue = 30) {
+    const [reel] = await db
+      .insert(reels)
+      .values({
+        userId,
+        shortcode: code,
+        url: `https://www.instagram.com/reel/${code}/`,
+        syncStatus: 'ok',
+        nextSyncAt: new Date(Date.now() - minutesOverdue * 60_000),
+      })
+      .returning({ id: reels.id })
+    return reel.id
+  }
+
+  it('запускает прогон и пишет строку sync_runs на каждый рилс', async () => {
+    const reelId = await seedDue('TickOne')
+
+    const report = await runCronTick()
+    expect(report.started).toBeGreaterThanOrEqual(1)
+
+    const runs = await db.select().from(syncRuns).where(eq(syncRuns.reelId, reelId))
+    expect(runs).toHaveLength(1)
+    expect(runs[0].triggeredBy).toBe('cron')
+    expect(runs[0].userId).toBe(userId)
+    expect(runs[0].shortcode).toBe('TickOne')
+  })
+
+  it('весь батч уходит ОДНИМ прогоном Apify', async () => {
+    await seedDue('TickBatchA')
+    await seedDue('TickBatchB')
+
+    await runCronTick()
+
+    const runs = await db
+      .select({ apifyRunId: syncRuns.apifyRunId, shortcode: syncRuns.shortcode })
+      .from(syncRuns)
+      .where(eq(syncRuns.userId, userId))
+
+    const batch = runs.filter((r) => r.shortcode?.startsWith('TickBatch'))
+    expect(batch).toHaveLength(2)
+    // Один прогон на оба рилса: платим за результаты, а не за прогоны,
+    // и десять запросов к Apify вместо одного — трата времени функции.
+    expect(new Set(batch.map((r) => r.apifyRunId)).size).toBe(1)
+  })
+
+  it('сдвигает next_sync_at, чтобы следующий тик не взял тот же рилс', async () => {
+    const reelId = await seedDue('TickShift')
+
+    await runCronTick()
+
+    const [reel] = await db.select().from(reels).where(eq(reels.id, reelId))
+    expect(reel.nextSyncAt!.getTime()).toBeGreaterThan(Date.now())
+
+    // Второй тик подряд не должен запустить этот рилс повторно.
+    const before = await db.select().from(syncRuns).where(eq(syncRuns.reelId, reelId))
+    await runCronTick()
+    const after = await db.select().from(syncRuns).where(eq(syncRuns.reelId, reelId))
+    expect(after.length).toBe(before.length)
+  })
+
+  it('уважает размер батча', async () => {
+    for (let i = 0; i < 4; i++) await seedDue(`TickLimit${i}`)
+
+    const report = await runCronTick(new Date(), 2)
+
+    expect(report.started).toBeLessThanOrEqual(2)
+  })
+
+  it('когда обновлять некого, тик проходит вхолостую без ошибок', async () => {
+    // Разгребаем всё, что осталось от прошлых тестов.
+    for (let i = 0; i < 5; i++) await runCronTick()
+
+    const report = await runCronTick()
+
+    expect(report.started).toBe(0)
+    expect(report.skipped).toBeNull()
   })
 })

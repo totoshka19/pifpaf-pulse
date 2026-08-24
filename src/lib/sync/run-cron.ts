@@ -1,8 +1,10 @@
 import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm'
 import { db, reels, syncRuns } from '@/db'
+import { tryReserve } from '@/db/queries/budget'
 import { ingestReel } from '@/db/queries/ingest'
+import { dueReels } from '@/db/queries/sync-state'
 import { ensureThumbnail } from '@/db/queries/thumbnails'
-import { getDatasetItems, getRun } from '@/lib/apify/client'
+import { getDatasetItems, getRun, isMock, startRun } from '@/lib/apify/client'
 
 /**
  * Фоновая синхронизация. Две фазы одного тика, обе ничего не ждут.
@@ -248,4 +250,118 @@ async function failRuns(ids: number[], error: string, now: Date): Promise<void> 
         eq(reels.syncStatus, 'pending'),
       ),
     )
+}
+
+/**
+ * Сколько рилсов берём за тик.
+ *
+ * Фаза 2 — один вызов Apify плюс N вставок; фаза 1 — один `getRun`, один
+ * `getDatasetItems` и до N приёмов со снапшотами. Приёмы и есть дорогая
+ * часть. Десять взяты как заведомо безопасное для десяти секунд Netlify
+ * и ЗАМЕРЕНЫ в задаче 9 — не менять на глаз.
+ *
+ * При 96 тиках в сутки это потолок в 960 рилсов, то есть очередь «кому пора»
+ * физически не может накопиться на демо-наборе в 60 рилсов.
+ */
+export const CRON_BATCH_SIZE = 10
+
+/**
+ * Провизорный сдвиг расписания в момент СТАРТА.
+ *
+ * Настоящее значение проставит `ingestReel` при успешном приёме. Этот сдвиг
+ * нужен только чтобы следующий тик не увидел тот же рилс всё ещё просроченным
+ * и не оплатил его второй раз. Час выбран как заведомо больше периода крона
+ * (15 минут); если прогон провалится и приём не состоится, рилс честно
+ * вернётся в очередь через час.
+ */
+const PROVISIONAL_SHIFT_MS = 3_600_000
+
+export type TickReport = {
+  collected: number
+  started: number
+  /** Почему фаза 2 не пошла. `null` — пошла нормально. */
+  skipped: 'budget' | null
+}
+
+/**
+ * Фаза 2: запустить прогон для рилсов, которым пора обновиться.
+ *
+ * Один вызов `startRun` на весь батч, не по одному на рилс: `resultsLimit`
+ * в Apify ограничивает результат НА URL (разведка задачи 1), значит батч из
+ * `due.length` ссылок в одном прогоне возвращает `due.length` элементов —
+ * ровно то же, что дали бы `due.length` отдельных прогонов, но одним сетевым
+ * вызовом вместо N и одной оплаченной единицей `apify_run_id` на всю группу
+ * (эту же группу потом одним проходом разберёт фаза 1 следующего тика).
+ */
+export async function runCronTick(
+  now = new Date(),
+  batchSize = CRON_BATCH_SIZE,
+): Promise<TickReport> {
+  // Порядок фиксирован: СНАЧАЛА собрать, потом запустить. Обратный заставил
+  // бы фазу 1 разбирать прогоны, стартовавшие секунду назад и заведомо
+  // не готовые.
+  const collected = await collectFinishedRuns(now)
+
+  const due = await dueReels(batchSize, now)
+  if (due.length === 0) return { collected, started: 0, skipped: null }
+
+  // Бюджет резервируется ДО запуска. Обратный порядок означает, что при
+  // исчерпанном лимите кредиты уже потрачены, а узнаём мы после.
+  // В режиме мока счётчик не трогаем: из тарифа Apify не расходуется ничего.
+  if (!isMock() && !(await tryReserve(due.length))) {
+    return { collected, started: 0, skipped: 'budget' }
+  }
+
+  // Строки пишутся ДО startRun — тот же порядок и та же причина, что в обоих
+  // ручных путях (POST /api/reels и POST /api/reels/:id/sync): если запуск
+  // бросит исключение, рилсы не должны остаться осиротевшими в pending без
+  // единой строки в sync_runs.
+  const inserted = await db
+    .insert(syncRuns)
+    .values(
+      due.map((reel) => ({
+        reelId: reel.id,
+        userId: reel.userId,
+        shortcode: reel.shortcode,
+        triggeredBy: 'cron' as const,
+        apifyRunId: null,
+        status: 'running' as const,
+        startedAt: now,
+      })),
+    )
+    .returning({ id: syncRuns.id })
+
+  const runIds = inserted.map((r) => r.id)
+
+  let run
+  try {
+    run = await startRun(due.map((reel) => reel.url))
+  } catch {
+    await failRuns(runIds, 'Не получилось запустить прогон Apify', now)
+    return { collected, started: 0, skipped: null }
+  }
+
+  await db
+    .update(syncRuns)
+    .set({
+      apifyRunId: run.runId,
+      status: run.status === 'FAILED' ? 'failed' : 'running',
+    })
+    .where(inArray(syncRuns.id, runIds))
+
+  await db
+    .update(reels)
+    .set({
+      syncStatus: 'pending',
+      syncError: null,
+      nextSyncAt: new Date(now.getTime() + PROVISIONAL_SHIFT_MS),
+    })
+    .where(
+      inArray(
+        reels.id,
+        due.map((reel) => reel.id),
+      ),
+    )
+
+  return { collected, started: due.length, skipped: null }
 }
