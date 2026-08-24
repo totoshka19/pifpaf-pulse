@@ -15,6 +15,7 @@ const MINUS = '−'
 
 const overview = (patch: Partial<StatsOverview> = {}): StatsOverview => ({
   reelsCount: 5,
+  reelsWithViews: 5,
   totalViews: 100_000,
   avgViews: 20_000,
   erPercent: 8.3,
@@ -29,6 +30,7 @@ describe('toKpiTiles — ноль это не «нет данных»', () => {
   it('у блогера без рилсов рилсов ноль, а просмотров нет вовсе', () => {
     const tiles = toKpiTiles({
       reelsCount: 0,
+      reelsWithViews: 0,
       totalViews: null,
       avgViews: null,
       erPercent: null,
@@ -63,11 +65,33 @@ describe('toKpiTiles — числа и точность', () => {
   })
 
   it('среднее подписывает числом рилсов со склонением', () => {
-    expect(find(toKpiTiles(overview({ reelsCount: 1 })), 'В среднем')?.hint).toBe('на 1 рилс')
-    expect(find(toKpiTiles(overview({ reelsCount: 2 })), 'В среднем')?.hint).toBe('на 2 рилса')
-    expect(find(toKpiTiles(overview({ reelsCount: 5 })), 'В среднем')?.hint).toBe('на 5 рилсов')
+    const hint = (n: number) =>
+      find(toKpiTiles(overview({ reelsCount: n, reelsWithViews: n })), 'В среднем')?.hint
+
+    expect(hint(1)).toBe('на 1 рилс')
+    expect(hint(2)).toBe('на 2 рилса')
+    expect(hint(5)).toBe('на 5 рилсов')
     // 11–14 — исключение русского счёта.
-    expect(find(toKpiTiles(overview({ reelsCount: 11 })), 'В среднем')?.hint).toBe('на 11 рилсов')
+    expect(hint(11)).toBe('на 11 рилсов')
+  })
+
+  it('подпись среднего считает рилсы С ДАННЫМИ, а не все', () => {
+    // Два рилса, просмотры известны у одного. AVG делит на один — значит
+    // и подпись обязана говорить про один, иначе читатель поделит сам
+    // и не сойдётся.
+    const tile = find(toKpiTiles(overview({ reelsCount: 2, reelsWithViews: 1 })), 'В среднем')
+
+    expect(tile?.hint).toBe('на 1 рилс с данными')
+  })
+
+  it('когда данных нет ни у кого, среднее — прочерк без подписи про рилсы', () => {
+    const tile = find(
+      toKpiTiles(overview({ reelsCount: 3, reelsWithViews: 0, avgViews: null })),
+      'В среднем',
+    )
+
+    expect(tile?.value).toBe('—')
+    expect(tile?.hint).toBeUndefined()
   })
 })
 

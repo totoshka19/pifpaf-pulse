@@ -44,7 +44,9 @@ function GrowthTooltip({
 
 export function GrowthChart({ points }: { points: ChartPoint[] }) {
   return (
-    <div className="h-64 w-full">
+    // aria-hidden: числа скринридер получает из <ChartTable> рядом,
+    // а внутренности SVG прочитались бы поверх неё бессмысленным шумом.
+    <div className="h-64 w-full" aria-hidden>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points} margin={{ top: 8, right: 20, bottom: 0, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />

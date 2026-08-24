@@ -28,6 +28,18 @@ export type KpiTile = {
  * пока мало». Остальные плитки на месте всегда: их отсутствие читалось бы
  * как поломка, а прочерк внутри — как «данных нет», что и требуется.
  */
+function averageHint(overview: StatsOverview): string | undefined {
+  const { reelsCount, reelsWithViews } = overview
+
+  if (reelsWithViews === 0) return undefined
+
+  const counted = `на ${reelsWithViews} ${plural(reelsWithViews, ['рилс', 'рилса', 'рилсов'])}`
+
+  // Уточнение «с данными» добавляем, только когда числа расходятся: на
+  // здоровом кабинете оно было бы лишним шумом.
+  return reelsWithViews === reelsCount ? counted : `${counted} с данными`
+}
+
 export function toKpiTiles(overview: StatsOverview): KpiTile[] {
   const tiles: KpiTile[] = [
     {
@@ -45,11 +57,12 @@ export function toKpiTiles(overview: StatsOverview): KpiTile[] {
       label: 'В среднем',
       value: formatCount(overview.avgViews),
       title: formatExact(overview.avgViews),
-      hint: `на ${overview.reelsCount} ${plural(overview.reelsCount, [
-        'рилс',
-        'рилса',
-        'рилсов',
-      ])}`,
+      // Подпись считает рилсы С ДАННЫМИ, а не все. AVG в SQL пропускает
+      // NULL, то есть делит на них же; сказать «на 2 рилса» рядом со
+      // средним по одному значит заставить читателя поделить самому
+      // и не сойтись. Когда данных нет вовсе, подписи нет: объяснять
+      // прочерк числом рилсов нечего.
+      hint: averageHint(overview),
     },
     {
       label: 'Вовлечённость',

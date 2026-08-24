@@ -5,6 +5,15 @@ import { rowsOf, toNumber } from './coerce'
 export type StatsOverview = {
   /** Сколько рилсов в кабинете. Настоящий ноль, а не «нет данных». */
   reelsCount: number
+  /**
+   * Сколько из них с известными просмотрами.
+   *
+   * Нужен подписи под средним. `AVG` в SQL пропускает NULL, то есть делит
+   * на число рилсов С ДАННЫМИ, а не на все. Это верно — усреднять нечего, —
+   * но подпись «на 2 рилса» рядом со средним по одному заставила бы
+   * читателя делить самому и не сойтись.
+   */
+  reelsWithViews: number
   /** Сумма последних известных просмотров. `null` — складывать нечего. */
   totalViews: number | null
   /** Среднее на рилс. `null` по той же причине. */
@@ -84,6 +93,7 @@ export async function statsOverview(userId: string): Promise<StatsOverview> {
       ) AS per_reel
     )
     SELECT (SELECT count(*) FROM latest)                       AS reels_count,
+           (SELECT count(*) FROM latest WHERE views IS NOT NULL) AS with_views,
            (SELECT SUM(views) FROM latest)                     AS total_views,
            (SELECT ROUND(AVG(views)) FROM latest)              AS avg_views,
            (SELECT ROUND(
@@ -101,6 +111,7 @@ export async function statsOverview(userId: string): Promise<StatsOverview> {
     // count(*) — bigint, то есть строка. Ноль рилсов это настоящий ноль,
     // поэтому здесь единственное место, где null сворачивается в 0.
     reelsCount: toNumber(row?.reels_count) ?? 0,
+    reelsWithViews: toNumber(row?.with_views) ?? 0,
     totalViews: toNumber(row?.total_views),
     avgViews: toNumber(row?.avg_views),
     erPercent: toNumber(row?.er_percent),

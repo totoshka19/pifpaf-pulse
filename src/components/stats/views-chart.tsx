@@ -53,7 +53,9 @@ function ViewsTooltip({
 
 export function ViewsChart({ points }: { points: ChartPoint[] }) {
   return (
-    <div className="h-64 w-full">
+    // aria-hidden: числа скринридер получает из <ChartTable> рядом,
+    // а внутренности SVG прочитались бы поверх неё бессмысленным шумом.
+    <div className="h-64 w-full" aria-hidden>
       <ResponsiveContainer width="100%" height="100%">
         {/* Правый отступ больше левого: подпись последнего дня («24 авг»)
             центрируется по своей засечке и без запаса обрезается краем. */}

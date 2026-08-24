@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ChartFrame } from '@/components/stats/chart-frame'
+import { ChartTable } from '@/components/stats/chart-table'
 import { KpiRow } from '@/components/stats/kpi-row'
 import { LazyViewsChart } from '@/components/stats/lazy-charts'
 import { PostingTimeChart } from '@/components/stats/posting-time-chart'
@@ -72,28 +73,42 @@ export default async function DashboardPage({ searchParams }: PageProps<'/app'>)
   // eslint-disable-next-line react-hooks/purity
   const serverNow = Date.now()
 
+  // Пустой кабинет получает ОДИН экран, а не строку прочерков и две пустые
+  // рамки графиков. Три полупустых блока подряд читаются как поломка;
+  // одно объяснение с кнопкой — как начало работы.
+  if (!hasReels) {
+    return (
+      <div className="flex flex-col items-center gap-4 rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-white/50 px-6 py-16 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-[var(--accent-soft)] to-white text-3xl shadow-[var(--shadow)]">
+          📈
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <h1 className="text-lg font-medium">Здесь появится аналитика</h1>
+          <p className="max-w-sm text-sm text-[var(--muted)]">
+            Добавь первый рилс — и мы посчитаем просмотры, вовлечённость
+            и подскажем, в какое время тебя смотрят охотнее.
+          </p>
+        </div>
+
+        <Link
+          href="/app/reels"
+          className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        >
+          Добавить первый рилс
+        </Link>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">Дашборд</h1>
-        <p className="text-sm text-[var(--muted)]">
-          {hasReels
-            ? 'Как расходятся твои рилсы'
-            : 'Добавь первый рилс — и здесь появятся цифры'}
-        </p>
+        <p className="text-sm text-[var(--muted)]">Как расходятся твои рилсы</p>
       </div>
 
       <KpiRow overview={overview} />
-
-      {!hasReels && (
-        <p className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-white/50 px-6 py-10 text-center text-sm text-[var(--muted)]">
-          Пока считать нечего.{' '}
-          <Link href="/app/reels" className="font-medium text-[var(--accent)] underline">
-            Добавь первый рилс
-          </Link>{' '}
-          — цифры и графики появятся сами.
-        </p>
-      )}
 
       <TopReels rows={byViews} now={serverNow} />
 
@@ -108,7 +123,14 @@ export default async function DashboardPage({ searchParams }: PageProps<'/app'>)
         emptyText="Данных для графика пока нет. Добавь рилс и загляни через день — точки появятся сами."
         action={<RangeSwitch current={range} />}
       >
-        <LazyViewsChart points={toViewsSeries(timeseries)} />
+        <>
+          <LazyViewsChart points={toViewsSeries(timeseries)} />
+          <ChartTable
+            points={toViewsSeries(timeseries)}
+            caption="Суммарные просмотры по дням"
+            valueLabel="Просмотров"
+          />
+        </>
       </ChartFrame>
 
       <ChartFrame

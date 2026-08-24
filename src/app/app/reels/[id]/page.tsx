@@ -4,6 +4,7 @@ import { ReelCover } from '@/components/reel-cover'
 import { SyncButton } from '@/components/reels/sync-button'
 import { SyncLog } from '@/components/reels/sync-log'
 import { ChartFrame } from '@/components/stats/chart-frame'
+import { ChartTable } from '@/components/stats/chart-table'
 import { LazyGrowthChart } from '@/components/stats/lazy-charts'
 import { reelDetail } from '@/db/queries/reel-detail'
 import { requireSession } from '@/lib/auth/require-session'
@@ -165,7 +166,15 @@ export default async function ReelPage({ params }: PageProps<'/app/reels/[id]'>)
             график появится после него.
           </p>
         ) : (
-          <LazyGrowthChart points={points} />
+          <>
+            <LazyGrowthChart points={points} />
+            <ChartTable
+              points={points}
+              caption="Замеры просмотров по времени"
+              valueLabel="Просмотров"
+              labelHeader="Замер"
+            />
+          </>
         )}
       </ChartFrame>
 
