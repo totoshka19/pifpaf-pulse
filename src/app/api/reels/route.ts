@@ -76,13 +76,38 @@ export async function POST(request: Request) {
       })
       .returning({ id: reels.id, shortcode: reels.shortcode })
 
-    const run = await startRun([parsed.canonicalUrl])
+    // Строка sync_runs пишется ДО startRun — тот же порядок и та же причина,
+    // что в POST /api/reels/:id/sync: если startRun бросит исключение, рилс
+    // не должен остаться осиротевшим в pending без единой строки в sync_runs.
+    // Без неё advanceIfPending не может отличить «прогон ещё идёт» от «прогона
+    // не было и не будет» и никогда не предложит «Повторить».
+    const [pendingRun] = await db
+      .insert(syncRuns)
+      .values({ reelId: reel.id, apifyRunId: null, status: 'running' })
+      .returning({ id: syncRuns.id })
 
-    await db.insert(syncRuns).values({
-      reelId: reel.id,
-      apifyRunId: run.runId,
-      status: run.status === 'FAILED' ? 'failed' : 'running',
-    })
+    let run
+    try {
+      run = await startRun([parsed.canonicalUrl])
+    } catch (error) {
+      await db
+        .update(syncRuns)
+        .set({
+          status: 'failed',
+          error: 'Не получилось запустить прогон Apify',
+          finishedAt: new Date(),
+        })
+        .where(eq(syncRuns.id, pendingRun.id))
+      throw error
+    }
+
+    await db
+      .update(syncRuns)
+      .set({
+        apifyRunId: run.runId,
+        status: run.status === 'FAILED' ? 'failed' : 'running',
+      })
+      .where(eq(syncRuns.id, pendingRun.id))
 
     return ok({ id: reel.id, shortcode: reel.shortcode, syncStatus: 'pending' }, 202)
   } catch (error) {

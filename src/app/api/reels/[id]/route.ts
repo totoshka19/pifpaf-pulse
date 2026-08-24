@@ -24,7 +24,30 @@ async function advanceIfPending(reelId: string): Promise<void> {
     .orderBy(desc(syncRuns.startedAt))
     .limit(1)
 
-  if (!run?.apifyRunId || run.status !== 'running') return
+  // Ничего не летит: либо прогона не было вовсе (осиротевший pending — оба
+  // маршрута, что создают sync_runs, теперь пишут строку ДО startRun, но
+  // старые записи или сбой до самой вставки всё ещё возможны), либо последняя
+  // попытка уже разрешилась в failed (startRun бросил исключение, или Apify
+  // сразу вернул FAILED). В обоих случаях ждать больше нечего: без этой ветки
+  // карточка стоит в pending бесконечно — pendingKey не меняется, опрос с
+  // фронта останавливается через ~5 минут и не возобновляется, а повторное
+  // добавление той же ссылки блокирует дедуп. Промотируем в failed, чтобы
+  // забрал существующий путь «Повторить».
+  if (!run || run.status === 'failed') {
+    await db
+      .update(reels)
+      .set({
+        syncStatus: 'failed',
+        syncError: 'Не получилось забрать данные. Попробуй обновить рилс ещё раз',
+      })
+      .where(eq(reels.id, reelId))
+    return
+  }
+
+  // status === 'running' — включая ещё не дописанный apifyRunId: строка
+  // вставляется ДО startRun, настоящий id приходит следующим UPDATE. Это
+  // прогон в процессе, его нельзя трогать — только ждать.
+  if (!run.apifyRunId || run.status !== 'running') return
 
   let handle
   try {
