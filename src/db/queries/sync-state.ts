@@ -1,5 +1,5 @@
-import { and, count, desc, eq, gte } from 'drizzle-orm'
-import { db, syncRuns } from '@/db'
+import { and, asc, count, desc, eq, gte, isNotNull, lte, ne } from 'drizzle-orm'
+import { db, reels, syncRuns } from '@/db'
 
 /**
  * Время последней попытки синхронизации по СТАБИЛЬНОЙ паре
@@ -65,4 +65,41 @@ export async function manualAttemptsSince(userId: string, since: Date): Promise<
     )
 
   return row?.n ?? 0
+}
+
+export type DueReel = { id: string; url: string; shortcode: string; userId: string }
+
+/**
+ * Рилсы, которым пора обновиться.
+ *
+ * Опирается на частичный индекс `idx_reels_due`, объявленный ещё в срезе 1
+ * ровно под этот запрос: `ON (next_sync_at) WHERE sync_status <> 'unavailable'`.
+ *
+ * Два способа сняться с расписания, и оба намеренные:
+ *  — `sync_status = 'unavailable'` — приватная или удалённая запись;
+ *  — `next_sync_at IS NULL` — то же самое, проставляет `ingestReel`.
+ * Опрашивать такие рилсы вечно значит тратить бюджет без шанса что-то
+ * получить.
+ *
+ * Порядок — от самого просроченного: если очередь всё-таки набежала, первым
+ * обновится тот, кто дольше всех ждёт, а не случайный.
+ */
+export async function dueReels(limit: number, now = new Date()): Promise<DueReel[]> {
+  return db
+    .select({
+      id: reels.id,
+      url: reels.url,
+      shortcode: reels.shortcode,
+      userId: reels.userId,
+    })
+    .from(reels)
+    .where(
+      and(
+        isNotNull(reels.nextSyncAt),
+        lte(reels.nextSyncAt, now),
+        ne(reels.syncStatus, 'unavailable'),
+      ),
+    )
+    .orderBy(asc(reels.nextSyncAt))
+    .limit(limit)
 }

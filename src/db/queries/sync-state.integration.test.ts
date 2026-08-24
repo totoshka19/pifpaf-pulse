@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { db, reels, syncRuns, users } from '@/db'
-import { lastAttemptFor, manualAttemptsSince } from './sync-state'
+import { dueReels, lastAttemptFor, manualAttemptsSince } from './sync-state'
 
 const OWNER = 'sync-state-owner@example.invalid'
 const STRANGER = 'sync-state-stranger@example.invalid'
@@ -273,5 +273,78 @@ describe('manualAttemptsSince', () => {
     // Раньше CASCADE обнулял счётчик вместе с рилсом — то есть лимит
     // сбрасывался тем же действием, от которого должен защищать.
     expect(after).toBe(before)
+  })
+})
+
+describe('dueReels — кого крон берёт в работу', () => {
+  const DUE_OWNER = 'due-owner@example.invalid'
+  let dueUserId: string
+
+  beforeAll(async () => {
+    await db.delete(users).where(eq(users.email, DUE_OWNER))
+    const [u] = await db
+      .insert(users)
+      .values({ email: DUE_OWNER, passwordHash: 'x', displayName: 'Пора' })
+      .returning({ id: users.id })
+    dueUserId = u.id
+
+    const mk = (code: string, nextSyncAt: Date | null, syncStatus: 'ok' | 'unavailable') =>
+      db.insert(reels).values({
+        userId: dueUserId,
+        shortcode: code,
+        url: `https://www.instagram.com/reel/${code}/`,
+        syncStatus,
+        nextSyncAt,
+      })
+
+    const ago = (m: number) => new Date(Date.now() - m * 60_000)
+    const ahead = (m: number) => new Date(Date.now() + m * 60_000)
+
+    await mk('DueOld', ago(120), 'ok') // просрочен сильнее всех
+    await mk('DueNow', ago(5), 'ok') // просрочен недавно
+    await mk('DueLater', ahead(60), 'ok') // ещё рано
+    await mk('DueGone', ago(120), 'unavailable') // снят с расписания статусом
+    await mk('DueNull', null, 'ok') // снят с расписания отсутствием даты
+  })
+
+  afterAll(async () => {
+    await db.delete(users).where(eq(users.email, DUE_OWNER))
+  })
+
+  it('берёт только просроченных', async () => {
+    const codes = (await dueReels(50)).map((r) => r.shortcode)
+
+    expect(codes).toContain('DueOld')
+    expect(codes).toContain('DueNow')
+    expect(codes).not.toContain('DueLater')
+  })
+
+  it('пропускает недоступные и снятые с расписания', async () => {
+    const codes = (await dueReels(50)).map((r) => r.shortcode)
+
+    // ingestReel снимает недоступный рилс с расписания, обнуляя next_sync_at.
+    // Опрашивать приватную или удалённую запись вечно — прямой расход бюджета
+    // без единого шанса что-то получить.
+    expect(codes).not.toContain('DueGone')
+    expect(codes).not.toContain('DueNull')
+  })
+
+  it('самый просроченный идёт первым', async () => {
+    const mine = (await dueReels(50)).filter((r) => r.userId === dueUserId)
+
+    expect(mine[0].shortcode).toBe('DueOld')
+  })
+
+  it('уважает лимит батча', async () => {
+    expect((await dueReels(1)).length).toBe(1)
+  })
+
+  it('отдаёт всё, что нужно для запуска прогона', async () => {
+    const [first] = await dueReels(1)
+
+    expect(typeof first.id).toBe('string')
+    expect(typeof first.url).toBe('string')
+    expect(typeof first.shortcode).toBe('string')
+    expect(typeof first.userId).toBe('string')
   })
 })
