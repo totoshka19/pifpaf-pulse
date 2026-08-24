@@ -2,12 +2,18 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ChartFrame } from '@/components/stats/chart-frame'
 import { KpiRow } from '@/components/stats/kpi-row'
+import { LazyViewsChart } from '@/components/stats/lazy-charts'
+import { RangeSwitch } from '@/components/stats/range-switch'
 import { TopReels } from '@/components/stats/top-reels'
 import { listReels } from '@/db/queries/list-reels'
 import { statsOverview } from '@/db/queries/stats-overview'
 import { statsPostingTime } from '@/db/queries/stats-posting-time'
-import { statsTimeseries } from '@/db/queries/stats-timeseries'
+import { statsTimeseries, type TimeseriesRange } from '@/db/queries/stats-timeseries'
 import { requireSession } from '@/lib/auth/require-session'
+import { toViewsSeries } from '@/lib/stats/chart-data'
+
+/** Белый список: значение из URL уходит в запрос и в ключ Record. */
+const RANGES: TimeseriesRange[] = ['7d', '30d', 'all']
 
 export const metadata: Metadata = { title: 'Дашборд' }
 
@@ -25,12 +31,17 @@ export const metadata: Metadata = { title: 'Дашборд' }
  * Топ-3 берётся из того же `listReels`, что кормит ленту, с сортировкой по
  * просмотрам: писать пятый запрос ради трёх карточек незачем.
  */
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: PageProps<'/app'>) {
   const session = await requireSession()
+
+  const requested = (await searchParams).range
+  const range: TimeseriesRange = RANGES.includes(requested as TimeseriesRange)
+    ? (requested as TimeseriesRange)
+    : '30d'
 
   const [overview, timeseries, postingTime, byViews] = await Promise.all([
     statsOverview(session.userId),
-    statsTimeseries(session.userId, '30d'),
+    statsTimeseries(session.userId, range),
     statsPostingTime(session.userId),
     listReels(session.userId, 'views'),
   ])
@@ -68,14 +79,18 @@ export default async function DashboardPage() {
 
       <TopReels rows={byViews} now={serverNow} />
 
-      {/* Графики приезжают задачами 8 и 9 среза 6. */}
       <ChartFrame
         title="Динамика просмотров"
-        hint="суммарно по всем рилсам, за 30 дней"
+        hint={
+          timeseries.length === 1
+            ? 'данных пока на один день — линия появится завтра'
+            : 'суммарно по всем рилсам'
+        }
         empty={timeseries.length === 0}
         emptyText="Данных для графика пока нет. Добавь рилс и загляни через день — точки появятся сами."
+        action={<RangeSwitch current={range} />}
       >
-        <p className="text-sm text-[var(--muted)]">{timeseries.length} точек</p>
+        <LazyViewsChart points={toViewsSeries(timeseries)} />
       </ChartFrame>
 
       <ChartFrame
