@@ -18,6 +18,13 @@ export default defineConfig({
     setupFiles: ['./src/test/load-env.ts'],
     // Параллельные файлы делили бы одну базу и мешали друг другу.
     fileParallelism: false,
+    // Интеграционные ходят в Neon во Франкфурте (round-trip на каждый запрос),
+    // а после среза 7 ещё и в CDN Instagram за обложками с обработкой через
+    // sharp. Дефолтные пять секунд vitest были не выбраны, а унаследованы,
+    // и для такого набора всегда были тонкими: один вызов collectFinishedRuns
+    // может стоить до трёх загрузок картинок.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
   resolve: {
     alias: {

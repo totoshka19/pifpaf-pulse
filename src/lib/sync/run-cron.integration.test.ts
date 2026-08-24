@@ -307,11 +307,6 @@ describe('collectFinishedRuns — лимит попыток на обложку 
   })
 
   it('не делает больше THUMBNAILS_PER_TICK попыток суммарно по ДВУМ группам за тик', async () => {
-    // Таймаут больше дефолтных 5000мс: до THUMBNAILS_PER_TICK (3)
-    // ПОСЛЕДОВАТЕЛЬНЫХ реальных сетевых скачиваний с CDN Instagram
-    // (fetchImage сам себе даёт до 8 с на каждое, TIMEOUT_MS в
-    // src/lib/images/fetch.ts) плюс обработка sharp — дефолтного окна
-    // объективно недостаточно, это не флак и не лишний запас.
     const base = Date.now()
 
     // Группа A: FIXTURE_CODE, двое владельцев, started_at строго РАНЬШЕ
@@ -359,5 +354,5 @@ describe('collectFinishedRuns — лимит попыток на обложку 
       if (await readThumbnail(reelId)) stored++
     }
     expect(stored).toBeLessThanOrEqual(THUMBNAILS_PER_TICK)
-  }, 30_000)
+  })
 })
