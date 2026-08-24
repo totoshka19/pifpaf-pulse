@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { db, reels, syncRuns, users } from '@/db'
 import { readThumbnail } from '@/db/queries/thumbnails'
-import { collectFinishedRuns, FAILED_RETRY_MS, STUCK_RUN_MS } from './run-cron'
+import { collectFinishedRuns, FAILED_RETRY_MS, STUCK_RUN_MS, THUMBNAILS_PER_TICK } from './run-cron'
 
 /**
  * Фаза 1 крона на ЖИВОЙ базе и МОКЕ Apify.
@@ -262,4 +262,82 @@ describe('collectFinishedRuns — глобальность распростра�
     expect(runMine.status).toBe('succeeded')
     expect(runTheirs.status).toBe('succeeded')
   })
+})
+
+describe('collectFinishedRuns — лимит попыток на обложку (находка 7 ревью)', () => {
+  // Четыре РАЗНЫХ владельца с ОДНИМ И ТЕМ ЖЕ реальным шорткодом.
+  // uq_reels_user_shortcode держит уникальность на паре (user_id,
+  // shortcode), не на shortcode отдельно — четыре разных пользователя
+  // МОГУТ сохранить одну и ту же публичную запись. Мок-идентификатор
+  // прогона детерминирован ТОЛЬКО шорткодом (shortcodesFrom в
+  // src/lib/apify/client.ts не смотрит на пользователя), поэтому все
+  // четыре строки syncRuns попадают в ОДНУ группу за один вызов
+  // getDatasetItems, а ingestReel матчит каждую по её СОБСТВЕННОМУ
+  // reelId и независимо проставляет thumbnailSrc всем четырём. Это даёт
+  // четыре рилса без обложки в одном тике БЕЗ шпиона на внутренние
+  // вызовы: наблюдаем состояние reel_thumbnails, как и весь остальной
+  // набор.
+  const OWNERS = [
+    'cron-thumb-1@example.invalid',
+    'cron-thumb-2@example.invalid',
+    'cron-thumb-3@example.invalid',
+    'cron-thumb-4@example.invalid',
+  ]
+  const ownerIds: string[] = []
+
+  beforeAll(async () => {
+    for (const email of OWNERS) {
+      await db.delete(users).where(eq(users.email, email))
+      const [u] = await db
+        .insert(users)
+        .values({ email, passwordHash: 'x', displayName: 'Обложка' })
+        .returning({ id: users.id })
+      ownerIds.push(u.id)
+    }
+  })
+
+  afterAll(async () => {
+    for (const email of OWNERS) {
+      await db.delete(users).where(eq(users.email, email))
+    }
+  })
+
+  it('не делает больше THUMBNAILS_PER_TICK попыток забрать обложку за тик', async () => {
+    // Таймаут больше дефолтных 5000мс: до THUMBNAILS_PER_TICK (3)
+    // ПОСЛЕДОВАТЕЛЬНЫХ реальных сетевых скачиваний с CDN Instagram
+    // (fetchImage сам себе даёт до 8 с на каждое, TIMEOUT_MS в
+    // src/lib/images/fetch.ts) плюс обработка sharp — дефолтного окна
+    // объективно недостаточно, это не флак и не лишний запас.
+    // Четыре кандидата — на одного больше THUMBNAILS_PER_TICK (3).
+    // startedAt задаём явно и по возрастанию: ORDER BY started_at ASC
+    // в самом начале collectFinishedRuns — тот же порядок, в котором
+    // группа обходит rows, значит порядок обработки внутри группы
+    // предсказуем и управляем нами, а не зависит от порядка вставки.
+    const base = Date.now()
+    const seeded = await Promise.all(
+      ownerIds.map((ownerId, i) => seedRunningReel(FIXTURE_CODE, new Date(base + i), ownerId)),
+    )
+
+    await collectFinishedRuns()
+
+    // Кандидаты ЗА пределами лимита исключены КОДОМ: ensureThumbnail для
+    // них вообще не вызывается (счётчик уже исчерпан), значит
+    // reel_thumbnails для них не может появиться НИ ПРИ КАКОМ исходе
+    // сети. Это детерминированная проверка самого факта отсечения, а не
+    // вероятностная зависимость от того, ответит ли CDN.
+    for (const { reelId } of seeded.slice(THUMBNAILS_PER_TICK)) {
+      expect(await readThumbnail(reelId)).toBeNull()
+    }
+
+    // Верхняя граница по всем четырём — слабее числом, но без сетевой
+    // зависимости в другую сторону: сеть могла подвести какую-то из
+    // первых THUMBNAILS_PER_TICK попыток (та же оговорка про протухшую
+    // CDN-ссылку фикстуры, что и в thumbnails.integration.test.ts), но
+    // БОЛЬШЕ лимита попыток код сделать не может ни при каких условиях.
+    let stored = 0
+    for (const { reelId } of seeded) {
+      if (await readThumbnail(reelId)) stored++
+    }
+    expect(stored).toBeLessThanOrEqual(THUMBNAILS_PER_TICK)
+  }, 30_000)
 })
