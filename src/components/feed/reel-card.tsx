@@ -35,6 +35,7 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
             author={card.author}
             caption={card.caption}
             priority={priority}
+            version={card.coverVersion}
           />
 
           {/* Просмотры поверх обложки: главная цифра карточки. Градиент —

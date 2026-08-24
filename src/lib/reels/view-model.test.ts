@@ -172,4 +172,13 @@ describe('toCardModel — тексты', () => {
     expect(toCardModel(row(), NOW).updated).toBe('обновлено 30 минут назад')
     expect(toCardModel(row({ lastSyncedAt: null }), NOW).updated).toBeNull()
   })
+
+  it('coverVersion — числовая метка синхронизации, не то же самое, что updated', () => {
+    // updated — готовая строка вида «обновлено 30 минут назад», она меняется
+    // каждую минуту сама по себе. coverVersion — сырой lastSyncedAt.getTime():
+    // <ReelCover> сравнивает эту метку, чтобы понять, когда стоит попробовать
+    // картинку заново, а постоянно меняющаяся строка для этого не годится.
+    expect(toCardModel(row(), NOW).coverVersion).toBe(row().lastSyncedAt!.getTime())
+    expect(toCardModel(row({ lastSyncedAt: null }), NOW).coverVersion).toBeNull()
+  })
 })

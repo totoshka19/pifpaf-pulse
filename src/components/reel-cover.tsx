@@ -21,10 +21,26 @@ type Props = {
   priority?: boolean
   /** В строке таблицы портретная обложка растянула бы строку до 70 px. */
   ratio?: 'portrait' | 'square'
+  /** Момент последней синхронизации рилса — версия обложки, см. ниже. */
+  version?: number | null
 }
 
-export function ReelCover({ reelId, author, caption, priority = false, ratio = 'portrait' }: Props) {
-  const [broken, setBroken] = useState(false)
+export function ReelCover({
+  reelId,
+  author,
+  caption,
+  priority = false,
+  ratio = 'portrait',
+  version,
+}: Props) {
+  const src = version ? `/api/thumbnails/${reelId}?v=${version}` : `/api/thumbnails/${reelId}`
+
+  // Храним НЕ факт поломки, а то, КАКОЙ именно src сломался. Тогда сброс
+  // не нужен: меняется version — меняется src — сравнение перестаёт совпадать,
+  // и картинка пробуется заново. С булевым флагом плейсхолдер залипал навсегда,
+  // потому что карточка обновляется на месте и компонент не размонтируется.
+  const [brokenSrc, setBrokenSrc] = useState<string | null>(null)
+  const broken = brokenSrc === src
 
   const letter = (author ?? '').trim().charAt(0).toUpperCase() || '?'
   const alt = caption?.trim()
@@ -35,8 +51,8 @@ export function ReelCover({ reelId, author, caption, priority = false, ratio = '
 
   return (
     <div
-      className={`relative w-full overflow-hidden rounded-[var(--radius)] bg-[#dbe4f5] ${
-        ratio === 'square' ? 'aspect-square rounded-lg' : 'aspect-9/16'
+      className={`relative w-full overflow-hidden bg-[#dbe4f5] ${
+        ratio === 'square' ? 'aspect-square rounded-lg' : 'aspect-9/16 rounded-[var(--radius)]'
       }`}
     >
       {broken ? (
@@ -55,12 +71,12 @@ export function ReelCover({ reelId, author, caption, priority = false, ratio = '
         // добавил бы обработку и привязку к возможностям площадки, не дав
         // ничего взамен.
         <img
-          src={`/api/thumbnails/${reelId}`}
+          src={src}
           alt={alt}
           loading={priority ? 'eager' : 'lazy'}
           decoding="async"
           className="h-full w-full object-cover"
-          onError={() => setBroken(true)}
+          onError={() => setBrokenSrc(src)}
         />
       )}
     </div>

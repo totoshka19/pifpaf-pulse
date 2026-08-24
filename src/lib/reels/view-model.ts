@@ -21,6 +21,8 @@ export type ReelCardModel = {
   state: ReelState
   caption: string
   author: string | null
+  /** Момент, когда обложка МОГЛА появиться. Меняется только при успешном приёме. */
+  coverVersion: number | null
   views: string
   viewsTitle: string
   likes: string
@@ -95,6 +97,7 @@ export function toCardModel(row: ReelListRow, now: Date): ReelCardModel {
     // потерять текст для поиска и для тултипа.
     caption: row.caption?.trim() || 'Без подписи',
     author: row.ownerUsername ? `@${row.ownerUsername}` : null,
+    coverVersion: row.lastSyncedAt ? row.lastSyncedAt.getTime() : null,
     views: formatCount(row.views),
     viewsTitle: formatExact(row.views),
     likes: formatCount(row.likes),

@@ -83,6 +83,7 @@ export function ReelsTable({ cards, highlighted, sort, onSort, onSync, onDelete 
                       author={card.author}
                       caption={card.caption}
                       ratio="square"
+                      version={card.coverVersion}
                     />
                   </span>
                   <span className="line-clamp-1 max-w-[22ch]">{card.caption}</span>
