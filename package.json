@@ -18,6 +18,7 @@
     "e2e:reels": "node scripts/e2e-reels.mjs",
     "verify:live": "node scripts/verify-live-apify.mjs",
     "e2e:thumbnails": "node scripts/e2e-thumbnails.mjs",
+    "e2e:feed": "node scripts/e2e-feed.mjs",
     "verify:prod": "node --env-file=.env.local scripts/verify-prod.mjs",
     "thumbs:backfill": "tsx --env-file=.env.local scripts/backfill-thumbnails.mts"
   },
