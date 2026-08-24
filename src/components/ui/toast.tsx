@@ -6,12 +6,25 @@ export type Toast = { id: number; text: string; kind: 'ok' | 'error' }
 
 let nextId = 0
 
+/**
+ * Потолок одновременно видимых тостов.
+ *
+ * Без него серия быстрых действий (удалить карточку, удалить, удалить)
+ * копит тост на тост на 4 секунды каждый. `pointer-events-none` у стека
+ * не даёт им перекрыть клик мимо, но на невысоком телефонном экране стопка
+ * из трёх-четырёх штук закрывает СОБОЙ кнопки действий карточки — те всегда
+ * видимы на мобильном (см. reel-card.tsx), и именно их и закрывает стопка.
+ */
+const MAX_VISIBLE = 2
+
 export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([])
 
   const push = useCallback((text: string, kind: 'ok' | 'error' = 'ok') => {
     const id = nextId++
-    setToasts((prev) => [...prev, { id, text, kind }])
+    // Новый тост всегда попадает на экран: если лимит уже занят, старейший
+    // уходит немедленно, а не ждёт своих 4 секунд.
+    setToasts((prev) => [...prev, { id, text, kind }].slice(-MAX_VISIBLE))
     setTimeout(() => setToasts((prev) => prev.filter((toast) => toast.id !== id)), 4000)
   }, [])
 

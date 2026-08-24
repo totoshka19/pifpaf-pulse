@@ -112,7 +112,13 @@ export function AddReelForm({ onAdded, onDuplicate, onError }: Props) {
           autoComplete="off"
           aria-invalid={hint !== null}
           aria-describedby={hint ? 'add-reel-hint' : undefined}
-          className="min-w-0 flex-1 rounded-xl border border-[var(--border)] px-4 py-3 outline-none focus:border-[var(--accent)]"
+          // basis-full на телефоне заставляет поле занять всю строку целиком —
+          // тогда flex-wrap на родителе честно переносит кнопки на вторую
+          // строку. Без него min-w-0 позволяет полю сжаться почти до нуля,
+          // и обёртке кажется, что всё и так поместилось: перенос не срабатывает,
+          // а ссылка в поле нечитаема (~90px на 375px экране). С sm: возвращаем
+          // basis-0 — исходное поведение flex-1, макет от sm: и выше не меняется.
+          className="min-w-0 flex-1 basis-full rounded-xl border border-[var(--border)] px-4 py-3 outline-none focus:border-[var(--accent)] sm:basis-0"
         />
 
         <button

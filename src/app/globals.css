@@ -40,3 +40,25 @@ body {
      вообще. Ссылаемся на переменную из next/font. */
   font-family: var(--font-sans), system-ui, sans-serif;
 }
+
+/* Видимый фокус на любом интерактивном элементе — обязателен для клавиатуры,
+   а не только украшение. Браузерный дефолт (обычно синий прямоугольник)
+   перебивают компоненты, которые задают свои фоны и рамки; без явного
+   :focus-visible Tab-обход ленты становится невидимым. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Пульсация на карточках и плавные переходы — украшение. Для тех, кто
+   попросил систему уменьшить движение, это ещё и источник дурноты. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -254,8 +254,16 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
         shown={visible.length}
       />
 
-      {cards.length === 0 ? (
+      {rows.length === 0 ? (
         <EmptyState />
+      ) : cards.length === 0 ? (
+        // Рилсы есть, но фильтр/поиск ничего не оставил — это не то же самое,
+        // что «пусто» с самого начала. Показывать иллюстрацию и пример ссылки
+        // здесь неправильно: блогер уже вставлял ссылку, ему нужно понять,
+        // что сузило список, а не как вообще добавить рилс.
+        <p className="rounded-[var(--radius)] border border-dashed border-[var(--border)] px-6 py-12 text-center text-sm text-[var(--muted)]">
+          Ничего не нашлось. Попробуй другой запрос или период
+        </p>
       ) : feedState.view === 'table' ? (
         <ReelsTable
           cards={cards}
