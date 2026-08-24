@@ -271,9 +271,10 @@ export function checkUserRate(recentAttempts: number, now: Date): ThrottleVerdic
 |---|---|
 | `src/lib/sync/rate-limit.ts` | `checkUserRate` — чистая функция |
 | `src/lib/sync/rate-limit.test.ts` | юнит-тесты к ней |
-| `src/db/queries/due-reels.ts` | выборка «кому пора», счётчики попыток |
-| `src/db/queries/due-reels.integration.test.ts` | тесты выборки и счётчиков |
+| `src/db/queries/sync-state.ts` | выборка «кому пора», счётчики попыток по пользователю и по паре |
+| `src/db/queries/sync-state.integration.test.ts` | тесты выборки и счётчиков |
 | `src/lib/sync/run-cron.ts` | обе фазы тика, без HTTP — чтобы тестировать напрямую |
+| `src/lib/sync/run-cron.integration.test.ts` | тесты обеих фаз на живой базе и фикстурах |
 | `src/app/api/cron/sync/route.ts` | тонкий HTTP-слой: секрет, вызов, ответ |
 | `scripts/e2e-cron.mjs` | сквозная проверка |
 | `netlify/functions/sync-cron.mts` | тонкий триггер: один `fetch` на `/api/cron/sync` |
