@@ -5,7 +5,9 @@ import type { ReelListRow } from '@/db/queries/list-reels'
 import { applyFeed, DEFAULT_FEED_STATE, type FeedState } from '@/lib/reels/filter'
 import { toCardModel } from '@/lib/reels/view-model'
 import { EmptyState } from './empty-state'
+import { FeedControls } from './feed-controls'
 import { ReelsGrid } from './reels-grid'
+import { ReelsTable } from './reels-table'
 
 type Props = {
   initialRows: ReelListRow[]
@@ -37,12 +39,10 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
     return () => clearInterval(timer)
   }, [])
 
-  const [feedState] = useState<FeedState>(DEFAULT_FEED_STATE)
+  const [feedState, setFeedState] = useState<FeedState>(DEFAULT_FEED_STATE)
 
-  const cards = useMemo(
-    () => applyFeed(rows, feedState, now).map((row) => toCardModel(row, now)),
-    [rows, feedState, now],
-  )
+  const visible = useMemo(() => applyFeed(rows, feedState, now), [rows, feedState, now])
+  const cards = useMemo(() => visible.map((row) => toCardModel(row, now)), [visible, now])
 
   // Управление, форма и мутации подключаются в задачах 8–10.
   const onSync = (id: string) => void id
@@ -52,8 +52,23 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Лента</h1>
 
+      <FeedControls
+        state={feedState}
+        onChange={setFeedState}
+        total={rows.length}
+        shown={visible.length}
+      />
+
       {cards.length === 0 ? (
         <EmptyState />
+      ) : feedState.view === 'table' ? (
+        <ReelsTable
+          cards={cards}
+          sort={feedState.sort}
+          onSort={(sort) => setFeedState((prev) => ({ ...prev, sort }))}
+          onSync={onSync}
+          onDelete={onDelete}
+        />
       ) : (
         <ReelsGrid cards={cards} onSync={onSync} onDelete={onDelete} />
       )}

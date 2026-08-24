@@ -19,9 +19,11 @@ type Props = {
   caption?: string | null
   /** Свежие карточки в начале ленты грузим сразу, остальные лениво. */
   priority?: boolean
+  /** В строке таблицы портретная обложка растянула бы строку до 70 px. */
+  ratio?: 'portrait' | 'square'
 }
 
-export function ReelCover({ reelId, author, caption, priority = false }: Props) {
+export function ReelCover({ reelId, author, caption, priority = false, ratio = 'portrait' }: Props) {
   const [broken, setBroken] = useState(false)
 
   const letter = (author ?? '').trim().charAt(0).toUpperCase() || '?'
@@ -32,7 +34,11 @@ export function ReelCover({ reelId, author, caption, priority = false }: Props) 
       : 'Обложка рилса'
 
   return (
-    <div className="relative aspect-9/16 w-full overflow-hidden rounded-[var(--radius)] bg-[#dbe4f5]">
+    <div
+      className={`relative w-full overflow-hidden rounded-[var(--radius)] bg-[#dbe4f5] ${
+        ratio === 'square' ? 'aspect-square rounded-lg' : 'aspect-9/16'
+      }`}
+    >
       {broken ? (
         <div
           className="flex h-full w-full items-center justify-center bg-linear-to-br from-[#c7d7ff] to-[#eef4ff]"
