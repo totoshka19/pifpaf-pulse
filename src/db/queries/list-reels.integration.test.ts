@@ -123,6 +123,34 @@ describe('listReels — типы, которыми приходят числа',
     expect(empty.views).toBeNull()
     expect(empty.growth7d).toBeNull()
   })
+
+  it('даты приходят объектами Date, а не строкой Postgres', async () => {
+    // db.execute() отдаёт timestamptz строкой в текстовом формате Postgres
+    // («2026-08-17 18:33:12+00»), а не объектом Date — тот же класс проблемы,
+    // что и с BIGINT выше, только для дат. Вся лента держится на обещании
+    // ReelListRow, что тут Date: formatRelative отличает валидную дату по
+    // instanceof Date, а сортировка по умолчанию зовёт row.createdAt.getTime()
+    // без защитной проверки. С одним рилсом в ленте баг незаметен —
+    // Array.prototype.sort не вызывает компаратор для массива из одного
+    // элемента, — и падает только при двух и более: воспроизведено вручную
+    // в браузере при проверке задачи 7.
+    const rows = await listReels(ownerId)
+    const grew = rows.find((row) => row.id === ids.grew)!
+    const empty = rows.find((row) => row.id === ids.empty)!
+
+    expect(grew.postedAt).toBeInstanceOf(Date)
+    expect(grew.createdAt).toBeInstanceOf(Date)
+    expect(grew.capturedAt).toBeInstanceOf(Date)
+
+    // Именно этот вызов бросил TypeError в браузере — проверяем его напрямую,
+    // а не через прокси вроде instanceof: getTime() обязан быть конечным
+    // числом, а не NaN от Invalid Date.
+    expect(Number.isFinite(grew.createdAt.getTime())).toBe(true)
+
+    // У рилса без снапшотов captured_at приходит через LEFT JOIN без пары —
+    // там настоящий SQL NULL, а не строка "null" и не Invalid Date.
+    expect(empty.capturedAt).toBeNull()
+  })
 })
 
 describe('listReels — прирост за 7 дней', () => {
