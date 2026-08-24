@@ -1,10 +1,12 @@
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { db, reels, syncRuns, users } from '@/db'
-import { lastAttemptFor } from './sync-state'
+import { lastAttemptFor, manualAttemptsSince } from './sync-state'
 
 const OWNER = 'sync-state-owner@example.invalid'
 const STRANGER = 'sync-state-stranger@example.invalid'
+const COUNTER = 'sync-state-counter@example.invalid'
+const CRON_USER = 'sync-state-cron@example.invalid'
 
 let userId: string
 let reelId: string
@@ -33,6 +35,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.delete(users).where(eq(users.email, OWNER))
   await db.delete(users).where(eq(users.email, STRANGER))
+  await db.delete(users).where(eq(users.email, COUNTER))
+  await db.delete(users).where(eq(users.email, CRON_USER))
 })
 
 describe('sync_runs — новые колонки', () => {
@@ -184,5 +188,90 @@ describe('lastAttemptFor — троттлинг переживает удале�
     expect(await lastAttemptFor(userId, 'ОбщийКод')).toBeNull()
 
     await db.delete(users).where(eq(users.id, stranger.id))
+  })
+})
+
+describe('manualAttemptsSince', () => {
+  it('считает только свежие попытки', async () => {
+    const [fresh] = await db
+      .insert(users)
+      .values({
+        email: COUNTER,
+        passwordHash: 'x',
+        displayName: 'Счёт',
+      })
+      .returning({ id: users.id })
+
+    const now = Date.now()
+    for (const minutesAgo of [0, 0.5, 5]) {
+      await db.insert(syncRuns).values({
+        userId: fresh.id,
+        shortcode: `C${minutesAgo}`,
+        status: 'running',
+        triggeredBy: 'manual',
+        startedAt: new Date(now - minutesAgo * 60_000),
+      })
+    }
+
+    // Окно в минуту захватывает две из трёх.
+    expect(await manualAttemptsSince(fresh.id, new Date(now - 60_000))).toBe(2)
+
+    await db.delete(users).where(eq(users.id, fresh.id))
+  })
+
+  it('НЕ считает прогоны крона', async () => {
+    const [cronUser] = await db
+      .insert(users)
+      .values({
+        email: CRON_USER,
+        passwordHash: 'x',
+        displayName: 'Крон',
+      })
+      .returning({ id: users.id })
+
+    // Тик крона тронул десять рилсов этого блогера. Он ничего не нажимал,
+    // и его кнопка «Обновить» блокироваться не должна.
+    for (let i = 0; i < 10; i++) {
+      await db.insert(syncRuns).values({
+        userId: cronUser.id,
+        shortcode: `Cron${i}`,
+        status: 'running',
+        triggeredBy: 'cron',
+        startedAt: new Date(),
+      })
+    }
+
+    expect(await manualAttemptsSince(cronUser.id, new Date(Date.now() - 60_000))).toBe(0)
+
+    await db.delete(users).where(eq(users.id, cronUser.id))
+  })
+
+  it('переживает удаление рилса', async () => {
+    const [reel] = await db
+      .insert(reels)
+      .values({
+        userId,
+        shortcode: 'CounterSurvives',
+        url: 'https://x/CounterSurvives',
+        syncStatus: 'ok',
+      })
+      .returning({ id: reels.id })
+
+    await db.insert(syncRuns).values({
+      reelId: reel.id,
+      userId,
+      shortcode: 'CounterSurvives',
+      status: 'running',
+      triggeredBy: 'manual',
+      startedAt: new Date(),
+    })
+
+    const before = await manualAttemptsSince(userId, new Date(Date.now() - 60_000))
+    await db.delete(reels).where(eq(reels.id, reel.id))
+    const after = await manualAttemptsSince(userId, new Date(Date.now() - 60_000))
+
+    // Раньше CASCADE обнулял счётчик вместе с рилсом — то есть лимит
+    // сбрасывался тем же действием, от которого должен защищать.
+    expect(after).toBe(before)
   })
 })

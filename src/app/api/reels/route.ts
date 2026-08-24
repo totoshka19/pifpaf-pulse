@@ -2,11 +2,12 @@ import { and, eq } from 'drizzle-orm'
 import { db, reels, syncRuns } from '@/db'
 import { tryReserve } from '@/db/queries/budget'
 import { listReels, type ReelSort } from '@/db/queries/list-reels'
-import { lastAttemptFor } from '@/db/queries/sync-state'
+import { lastAttemptFor, manualAttemptsSince } from '@/db/queries/sync-state'
 import { fail, handleError, ok } from '@/lib/api/respond'
 import { isMock, startRun } from '@/lib/apify/client'
 import { requireSession } from '@/lib/auth/require-session'
 import { normalizeReelUrl } from '@/lib/instagram/normalize-url'
+import { checkUserRate, USER_SYNC_WINDOW_MS } from '@/lib/sync/rate-limit'
 import { checkManualSync } from '@/lib/sync/throttle'
 
 export const runtime = 'nodejs'
@@ -38,6 +39,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await requireSession()
+
+    // Добавление рилса ТОЖЕ запускает прогон и тоже стоит кредита.
+    // Ограничить только кнопку «Обновить» значило бы оставить открытой
+    // вторую дверь — ровно ту, через которую утекает бюджет в сценарии
+    // «удалил → вставил заново».
+    const attempts = await manualAttemptsSince(
+      session.userId,
+      new Date(Date.now() - USER_SYNC_WINDOW_MS),
+    )
+    const rate = checkUserRate(attempts, new Date())
+    if (!rate.allowed) return fail(rate.message, 429)
+
     const body = await request.json().catch(() => null)
 
     const parsed = normalizeReelUrl(typeof body?.url === 'string' ? body.url : '')

@@ -1,11 +1,12 @@
 import { eq } from 'drizzle-orm'
 import { db, reels, syncRuns } from '@/db'
 import { tryReserve } from '@/db/queries/budget'
-import { lastAttemptFor } from '@/db/queries/sync-state'
+import { lastAttemptFor, manualAttemptsSince } from '@/db/queries/sync-state'
 import { fail, handleError, ok } from '@/lib/api/respond'
 import { isMock, startRun } from '@/lib/apify/client'
 import { assertOwned } from '@/lib/auth/ownership'
 import { requireSession } from '@/lib/auth/require-session'
+import { checkUserRate, USER_SYNC_WINDOW_MS } from '@/lib/sync/rate-limit'
 import { checkManualSync } from '@/lib/sync/throttle'
 
 export const runtime = 'nodejs'
@@ -33,6 +34,16 @@ export async function POST(
     // Проверка владения ДО любых действий: обратный порядок позволил бы чужому
     // пользователю тратить наши кредиты Apify на чужой записи.
     const reel = assertOwned(found, session)
+
+    // Лимит на человека идёт ПЕРВЫМ: он дешевле часового (один COUNT против
+    // выборки с сортировкой) и отсекает разгон по разным рилсам, который
+    // часовой троттлинг пропускает по построению.
+    const attempts = await manualAttemptsSince(
+      session.userId,
+      new Date(Date.now() - USER_SYNC_WINDOW_MS),
+    )
+    const rate = checkUserRate(attempts, new Date())
+    if (!rate.allowed) return fail(rate.message, 429)
 
     // Источник — sync_runs.started_at, а не reels.lastSyncedAt: последнее поле
     // пишет только ingestReel при успехе или unavailable (src/db/queries/ingest.ts).

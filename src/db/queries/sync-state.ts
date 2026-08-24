@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, count, desc, eq, gte } from 'drizzle-orm'
 import { db, syncRuns } from '@/db'
 
 /**
@@ -23,9 +23,9 @@ import { db, syncRuns } from '@/db'
  * же час — не путать с доккомментом колонки `triggered_by` в `schema.ts`,
  * который объясняет НАЗНАЧЕНИЕ колонки (не путать крон с пользователем при
  * подсчёте лимита на пользователя), а не то, что крон нигде не считается.
- * Фильтр `triggered_by = 'manual'` нужен только отдельному, ещё не
- * реализованному лимиту «N попыток в минуту НА ПОЛЬЗОВАТЕЛЯ» (AGENTS.md,
- * срез 7) — здесь его нет и быть не должно.
+ * Фильтр `triggered_by = 'manual'` нужен только отдельному лимиту
+ * «N попыток в минуту НА ПОЛЬЗОВАТЕЛЯ» — см. `manualAttemptsSince` ниже —
+ * здесь его нет и быть не должно.
  */
 export async function lastAttemptFor(
   userId: string,
@@ -39,4 +39,30 @@ export async function lastAttemptFor(
     .limit(1)
 
   return row?.startedAt ?? null
+}
+
+/**
+ * Сколько РУЧНЫХ попыток пользователь сделал начиная с момента `since`.
+ *
+ * `triggered_by = 'manual'` — не украшение. Без него тик крона, тронувший
+ * десять рилсов блогера, засчитался бы как десять его попыток и заблокировал
+ * бы ему кнопку при том, что он ничего не нажимал.
+ *
+ * Считается по `user_id`, а не через JOIN к `reels`: строка переживает
+ * удаление рилса, и счётчик вместе с ней. Иначе лимит обнулялся бы тем же
+ * действием, от которого защищает.
+ */
+export async function manualAttemptsSince(userId: string, since: Date): Promise<number> {
+  const [row] = await db
+    .select({ n: count() })
+    .from(syncRuns)
+    .where(
+      and(
+        eq(syncRuns.userId, userId),
+        eq(syncRuns.triggeredBy, 'manual'),
+        gte(syncRuns.startedAt, since),
+      ),
+    )
+
+  return row?.n ?? 0
 }
