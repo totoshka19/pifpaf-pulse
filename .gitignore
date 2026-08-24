@@ -50,3 +50,6 @@ next-env.d.ts
 
 # рабочие артефакты subagent-driven-development
 /.superpowers
+
+# локальный конфиг дев-сервера для инструментов Claude Code
+/.claude
