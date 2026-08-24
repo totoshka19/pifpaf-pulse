@@ -148,7 +148,31 @@ export const syncRuns = pgTable(
   'sync_runs',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    reelId: uuid('reel_id').references(() => reels.id, { onDelete: 'cascade' }),
+    /**
+     * SET NULL, а не CASCADE. Удаление рилса больше не стирает историю его
+     * попыток: на ней держатся оба лимита, и обнулять её значит открывать
+     * дыру «удалил → вставил заново → троттлинг обойдён».
+     */
+    reelId: uuid('reel_id').references(() => reels.id, { onDelete: 'set null' }),
+    /**
+     * Владелец попытки. Пережить удаление рилса обязан — иначе лимит
+     * «N в минуту на пользователя» обнуляется тем же удалением.
+     */
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * Вместе с user_id образует СТАБИЛЬНУЮ идентичность «копии рилса у этого
+     * блогера»: в reels на этой паре стоит uq_reels_user_shortcode. В отличие
+     * от reel_id, она переживает удаление и повторную вставку.
+     */
+    shortcode: text('shortcode'),
+    /**
+     * Кто инициировал. Без этого прогон крона считался бы попыткой
+     * пользователя, и тик, тронувший десять моих рилсов, заблокировал бы мне
+     * кнопку «Обновить» на минуту — при том, что я ничего не нажимал.
+     */
+    triggeredBy: text('triggered_by', { enum: ['manual', 'cron'] })
+      .notNull()
+      .default('manual'),
     apifyRunId: text('apify_run_id'),
     status: text('status', { enum: ['running', 'succeeded', 'failed'] }).notNull(),
     error: text('error'),
@@ -157,6 +181,16 @@ export const syncRuns = pgTable(
   },
   (t) => [
     check('ck_sync_runs_status', sql`${t.status} IN ('running', 'succeeded', 'failed')`),
+    check('ck_sync_runs_triggered_by', sql`${t.triggeredBy} IN ('manual', 'cron')`),
+    // Троттлинг читает MAX(started_at) по паре — индекс ровно под этот запрос.
+    index('idx_sync_runs_pair').on(t.userId, t.shortcode, t.startedAt.desc()),
+    // Лимит на пользователя: свежие ручные попытки одного человека.
+    index('idx_sync_runs_user_ts').on(t.userId, t.startedAt.desc()),
+    // Фаза 1 крона ищет незавершённые прогоны. Частичный: завершённых
+    // строк со временем станет на порядки больше, чем висящих.
+    index('idx_sync_runs_running')
+      .on(t.apifyRunId)
+      .where(sql`status = 'running'`),
   ],
 )
 
