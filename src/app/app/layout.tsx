@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/lib/auth/session-user'
 import { LogoutButton } from './logout-button'
+import { AppNav } from './nav'
 
 /**
  * Оболочка кабинета: одна шапка на все экраны `/app/*`.
@@ -20,13 +21,19 @@ export default async function AppLayout({ children }: LayoutProps<'/app'>) {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg)]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
           <Link href="/app" className="flex items-baseline gap-2">
             <span className="text-lg font-semibold tracking-tight">PifPaf&nbsp;Pulse</span>
-            <span className="hidden text-xs text-[var(--muted)] sm:inline">
+            <span className="hidden text-xs text-[var(--muted)] lg:inline">
               аналитика рилсов
             </span>
           </Link>
+
+          {/* На узком экране навигация переезжает на свою строку: три пункта,
+              имя и «Выйти» в 375px в один ряд не помещаются. Делает это
+              order-last вместе с w-full, а не второй экземпляр компонента —
+              двух ориентиров <nav> с одинаковой подписью быть не должно. */}
+          <AppNav className="order-last w-full sm:order-none sm:w-auto" />
 
           <div className="flex items-center gap-3">
             <span className="hidden text-sm text-[var(--muted)] sm:inline">
