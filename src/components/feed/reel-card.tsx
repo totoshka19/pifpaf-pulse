@@ -73,8 +73,8 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
         <span title={card.postedTitle}>{card.posted}</span>
-        <span>♥ {card.likes}</span>
-        <span>💬 {card.comments}</span>
+        <span aria-label={`Лайков: ${card.likes}`}>♥ {card.likes}</span>
+        <span aria-label={`Комментариев: ${card.comments}`}>💬 {card.comments}</span>
         <span title="Вовлечённость: (лайки + комментарии) ÷ просмотры">ER {card.er}</span>
       </div>
 

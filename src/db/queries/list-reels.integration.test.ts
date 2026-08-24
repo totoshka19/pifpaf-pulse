@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { db, reels, reelSnapshots, users } from '@/db'
-import { listReels } from './list-reels'
+import { listReels, type ReelSort } from './list-reels'
 
 /**
  * Лента на ЖИВОЙ базе Neon.
@@ -201,5 +201,16 @@ describe('listReels — сортировка и изоляция', () => {
 
     expect(rows).toHaveLength(5)
     expect(rows.some((row) => row.shortcode === 'FeedAlien')).toBe(false)
+  })
+
+  it('нераспознанный sort не роняет запрос — тихо падает на added', async () => {
+    // ORDER — Record<ReelSort, ...>, но сам ReelSort — это только подсказка
+    // компилятору: маршрут (route.ts) уже фильтрует значение своим белым
+    // списком, а этот тест проверяет запрос независимо от него — ORDER[sort]
+    // без ?? ORDER.added уходит в SQL как undefined при любом значении вне
+    // перечисления, если защиту маршрута когда-нибудь обойдут или упростят.
+    const rows = await listReels(ownerId, 'garbage' as ReelSort)
+
+    expect(rows).toHaveLength(5)
   })
 })

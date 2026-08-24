@@ -107,12 +107,16 @@ console.log('\n── Лента')
 const feed = await owner('GET', '/api/reels')
 const row = feed.json.reels.find((item) => item.id === id)
 check('рилс есть в ленте', Boolean(row))
-check('просмотры пришли числом', typeof row.views === 'number', typeof row.views)
-check('growth7d присутствует в ответе', 'growth7d' in row)
+// Опциональная цепочка ниже НЕ декоративная: если рилса в ленте нет — именно
+// то, что проверяет чек выше, — прямое обращение к row.views бросило бы
+// TypeError и оборвало скрипт до сортировок, дедупа, изоляции и удаления,
+// потеряв диагностику ровно тогда, когда она нужнее всего.
+check('просмотры пришли числом', typeof row?.views === 'number', typeof row?.views)
+check('growth7d присутствует в ответе', Boolean(row) && 'growth7d' in row)
 check(
   'growth7d равен null при одной точке',
-  row.growth7d === null,
-  String(row.growth7d),
+  row?.growth7d === null,
+  String(row?.growth7d),
 )
 
 console.log('\n── Сортировки')

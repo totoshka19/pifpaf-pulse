@@ -142,7 +142,7 @@ export async function listReels(userId: string, sort: ReelSort = 'added') {
       WHERE r.user_id = ${userId}
       ORDER BY r.id, s.captured_at DESC
     ) AS latest
-    ORDER BY ${ORDER[sort]}
+    ORDER BY ${ORDER[sort] ?? ORDER.added}
   `)
 
   const raw = (Array.isArray(rows) ? rows : ((rows as { rows?: unknown[] }).rows ?? [])) as Record<
