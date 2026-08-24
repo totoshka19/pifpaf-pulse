@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { NO_DATA } from './number'
-import { formatDayMsk, formatExactMsk, formatRelative } from './date'
+import { formatDayMsk, formatExactMsk, formatIsoDayShort, formatRelative } from './date'
 
 /** 24 августа 2026, 16:30 UTC = 19:30 по Москве. */
 const AUG = new Date('2026-08-24T16:30:00Z')
@@ -97,5 +97,28 @@ describe('formatRelative — «сколько назад»', () => {
 
   it('нет даты — прочерк', () => {
     expect(formatRelative(null, now)).toBe(NO_DATA)
+  })
+})
+
+describe('formatIsoDayShort', () => {
+  it('превращает московский день из запроса в короткую подпись', () => {
+    expect(formatIsoDayShort('2026-08-24')).toBe('24 авг')
+  })
+
+  it('срезает ведущий ноль в числе', () => {
+    expect(formatIsoDayShort('2026-01-01')).toBe('1 янв')
+  })
+
+  it('не уезжает на сутки назад на первом января', () => {
+    // Через `new Date('2026-01-01')` это была бы полночь UTC, и любой пояс
+    // западнее Гринвича показал бы 31 декабря.
+    expect(formatIsoDayShort('2026-01-01')).not.toBe('31 дек')
+  })
+
+  it('мусор и пустая строка — прочерк, а не «Invalid Date»', () => {
+    expect(formatIsoDayShort('')).toBe(NO_DATA)
+    expect(formatIsoDayShort(null)).toBe(NO_DATA)
+    expect(formatIsoDayShort('24.08.2026')).toBe(NO_DATA)
+    expect(formatIsoDayShort('2026-13-01')).toBe(NO_DATA)
   })
 })

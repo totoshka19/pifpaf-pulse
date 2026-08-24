@@ -85,6 +85,31 @@ export function formatDayMsk(date: Date | null, timeZone = MOSCOW_TZ): string {
 }
 
 /**
+ * «2026-08-24» → «24 авг».
+ *
+ * Принимает СТРОКУ, а не `Date`, намеренно. Аналитические запросы среза 6
+ * отдают день уже посчитанным в московском календаре (`to_char(day,
+ * 'YYYY-MM-DD')`). Превратить его обратно в `Date`, чтобы тут же снова
+ * применить пояс, — это лишний круг, на котором дата может уехать: `new
+ * Date('2026-01-01')` — это полночь UTC, и любой пояс западнее Гринвича
+ * покажет 31 декабря прошлого года.
+ *
+ * Пустая строка или мусор — прочерк, а не «Invalid Date».
+ */
+export function formatIsoDayShort(iso: string | null): string {
+  if (!iso) return NO_DATA
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  if (!match) return NO_DATA
+
+  const month = Number(match[2])
+  if (month < 1 || month > 12) return NO_DATA
+
+  // Ведущий ноль срезаем: «1 янв», а не «01 янв».
+  return `${Number(match[3])} ${MONTHS_SHORT[month - 1]}`
+}
+
+/**
  * Номер календарного дня в поясе.
  *
  * Нужен, чтобы «вчера» означало вчерашний календарный день, а не «24 часа
