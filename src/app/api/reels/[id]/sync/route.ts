@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { db, reels, syncRuns } from '@/db'
 import { tryReserve } from '@/db/queries/budget'
 import { fail, handleError, ok } from '@/lib/api/respond'
@@ -33,7 +33,19 @@ export async function POST(
     // пользователю тратить наши кредиты Apify на чужой записи.
     const reel = assertOwned(found, session)
 
-    const verdict = checkManualSync(reel.lastSyncedAt, new Date())
+    // Источник — sync_runs.started_at, а не reels.lastSyncedAt: последнее поле
+    // пишет только ingestReel при успехе или unavailable (src/db/queries/ingest.ts).
+    // Провалившийся прогон lastSyncedAt не трогает, а кредит Apify уже потрачен —
+    // троттлить по lastSyncedAt значило бы никогда не троттлить кнопку «Повторить»
+    // у рилсов в failed. Не «упрощать» обратно на reel.lastSyncedAt.
+    const [lastRun] = await db
+      .select({ startedAt: syncRuns.startedAt })
+      .from(syncRuns)
+      .where(eq(syncRuns.reelId, reel.id))
+      .orderBy(desc(syncRuns.startedAt))
+      .limit(1)
+
+    const verdict = checkManualSync(lastRun?.startedAt ?? null, new Date())
     if (!verdict.allowed) return fail(verdict.message, 429)
 
     // Бюджет резервируется ДО запуска. Обратный порядок означает, что при
