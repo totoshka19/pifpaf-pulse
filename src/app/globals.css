@@ -15,6 +15,12 @@
   --ink: #0f172a;
   --muted: #64748b;
   --radius: 20px;
+  --accent: #4f46e5;
+  --accent-soft: #e0e7ff;
+  --border: rgba(15, 23, 42, 0.08);
+  --shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+  --up: #16a34a;
+  --down: #dc2626;
 }
 
 @theme inline {
@@ -22,6 +28,8 @@
   --color-surface: var(--surface);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --font-sans: var(--font-geist-sans);
 }
 
