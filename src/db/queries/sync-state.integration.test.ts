@@ -278,6 +278,18 @@ describe('manualAttemptsSince', () => {
 
 describe('dueReels — кого крон берёт в работу', () => {
   const DUE_OWNER = 'due-owner@example.invalid'
+  // dueReels — запрос по ВСЕЙ базе, общей с продом, без фильтра по
+  // пользователю (см. доккомент dueReels в sync-state.ts). На момент
+  // ревью этой задачи на живой базе уже нашлось 6 глобально просроченных
+  // строк, 4 из них старше фикстуры DueOld — а крона, который разбирал бы
+  // очередь, ещё нет (появится в задаче 8), значит число только растёт.
+  // Лимит 50 в проверках СОДЕРЖИМОГО и ПОРЯДКА рано или поздно перестанет
+  // довозить фикстуры этого теста до окна выдачи, и тесты начнут мигать
+  // по причине, не связанной с кодом. Поэтому здесь заведомо большой
+  // лимит — НЕ опечатка и не небрежность, не уменьшать обратно к 50.
+  // Маленький буквальный лимит остаётся только там, где сам размер батча
+  // и есть предмет проверки — тест «уважает лимит батча» ниже.
+  const HUGE_LIMIT = 10_000
   let dueUserId: string
 
   beforeAll(async () => {
@@ -324,7 +336,7 @@ describe('dueReels — кого крон берёт в работу', () => {
   })
 
   it('берёт только просроченных', async () => {
-    const codes = (await dueReels(50)).map((r) => r.shortcode)
+    const codes = (await dueReels(HUGE_LIMIT)).map((r) => r.shortcode)
 
     expect(codes).toContain('DueOld')
     expect(codes).toContain('DueNow')
@@ -332,7 +344,7 @@ describe('dueReels — кого крон берёт в работу', () => {
   })
 
   it('пропускает недоступные и снятые с расписания', async () => {
-    const codes = (await dueReels(50)).map((r) => r.shortcode)
+    const codes = (await dueReels(HUGE_LIMIT)).map((r) => r.shortcode)
 
     // ingestReel снимает недоступный рилс с расписания, обнуляя next_sync_at.
     // Опрашивать приватную или удалённую запись вечно — прямой расход бюджета
@@ -342,7 +354,7 @@ describe('dueReels — кого крон берёт в работу', () => {
   })
 
   it('самый просроченный идёт первым', async () => {
-    const mine = (await dueReels(50)).filter((r) => r.userId === dueUserId)
+    const mine = (await dueReels(HUGE_LIMIT)).filter((r) => r.userId === dueUserId)
 
     // Полный порядок, а не только первый элемент. У этого пользователя ровно
     // два рилса проходят фильтр «пора»: DueLater ещё не просрочен, DueGone
