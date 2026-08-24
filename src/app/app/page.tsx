@@ -1,5 +1,9 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { ChartFrame } from '@/components/stats/chart-frame'
+import { KpiRow } from '@/components/stats/kpi-row'
+import { TopReels } from '@/components/stats/top-reels'
+import { listReels } from '@/db/queries/list-reels'
 import { statsOverview } from '@/db/queries/stats-overview'
 import { statsPostingTime } from '@/db/queries/stats-posting-time'
 import { statsTimeseries } from '@/db/queries/stats-timeseries'
@@ -10,24 +14,34 @@ export const metadata: Metadata = { title: 'Дашборд' }
 /**
  * Дашборд кабинета.
  *
- * Три запроса идут через `Promise.all`, а не по очереди. На free tier Neon
- * засыпает после простоя, и три последовательных круга дали бы три задержки
- * пробуждения вместо одной — на холодном старте это разница в секунды.
+ * Четыре запроса идут через `Promise.all`, а не по очереди. На free tier Neon
+ * засыпает после простоя, и четыре последовательных круга дали бы четыре
+ * задержки пробуждения вместо одной — на холодном старте это разница в секунды.
  *
  * Запросы зовутся НАПРЯМУЮ, без похода в собственные `/api/*`: серверный
  * компонент и так на сервере, и лишний HTTP-хоп добавил бы круг по сети
  * и вторую сериализацию.
+ *
+ * Топ-3 берётся из того же `listReels`, что кормит ленту, с сортировкой по
+ * просмотрам: писать пятый запрос ради трёх карточек незачем.
  */
 export default async function DashboardPage() {
   const session = await requireSession()
 
-  const [overview, timeseries, postingTime] = await Promise.all([
+  const [overview, timeseries, postingTime, byViews] = await Promise.all([
     statsOverview(session.userId),
     statsTimeseries(session.userId, '30d'),
     statsPostingTime(session.userId),
+    listReels(session.userId, 'views'),
   ])
 
   const hasReels = overview.reelsCount > 0
+
+  // Серверный компонент вызывается один раз за запрос и не мемоизируется
+  // React Compiler. Date.now() здесь и есть лекарство от расхождения разметки,
+  // а не его причина — тот же приём, что в ленте.
+  // eslint-disable-next-line react-hooks/purity
+  const serverNow = Date.now()
 
   return (
     <div className="flex flex-col gap-6">
@@ -40,7 +54,21 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Наполнение приезжает задачами 7–9 среза 6. */}
+      <KpiRow overview={overview} />
+
+      {!hasReels && (
+        <p className="rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-white/50 px-6 py-10 text-center text-sm text-[var(--muted)]">
+          Пока считать нечего.{' '}
+          <Link href="/app/reels" className="font-medium text-[var(--accent)] underline">
+            Добавь первый рилс
+          </Link>{' '}
+          — цифры и графики появятся сами.
+        </p>
+      )}
+
+      <TopReels rows={byViews} now={serverNow} />
+
+      {/* Графики приезжают задачами 8 и 9 среза 6. */}
       <ChartFrame
         title="Динамика просмотров"
         hint="суммарно по всем рилсам, за 30 дней"
