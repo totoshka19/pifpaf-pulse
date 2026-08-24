@@ -45,6 +45,24 @@ function toNumber(value: unknown): number | null {
 }
 
 /**
+ * Тот же класс проблемы, что и с BIGINT выше: `db.execute()` отдаёт
+ * timestamptz строкой в текстовом формате Postgres («2026-08-17 18:33:12+00»),
+ * а не объектом Date, — типизированный маппер Drizzle сюда не дотягивается.
+ * `ReelListRow` обещает `Date`, и на этом обещании держится форматирование
+ * (`formatRelative` проверяет `instanceof Date`) и сортировка ленты по
+ * умолчанию (`row.createdAt.getTime()` без защитной проверки). Без приведения
+ * карточка молча показывает «—» вместо даты, а лента из двух и более рилсов
+ * падает с TypeError при первом же рендере — воспроизведено вручную в браузере.
+ */
+function toDate(value: unknown): Date | null {
+  if (value === null || value === undefined) return null
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value
+
+  const parsed = new Date(value as string)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+/**
  * Имена в ORDER BY — АЛИАСЫ внутреннего запроса, а не колонки таблиц.
  * Кавычки делают идентификатор регистрозависимым: после `AS "createdAt"`
  * колонки `created_at` во внешней области видимости уже не существует.
@@ -138,5 +156,11 @@ export async function listReels(userId: string, sort: ReelSort = 'added') {
     likes: toNumber(row.likes),
     comments: toNumber(row.comments),
     growth7d: toNumber(row.growth7d),
+    postedAt: toDate(row.postedAt),
+    lastSyncedAt: toDate(row.lastSyncedAt),
+    capturedAt: toDate(row.capturedAt),
+    // created_at — NOT NULL в схеме и приходит от ведущей таблицы (reels),
+    // а не через LEFT JOIN: здесь это всегда настоящая дата.
+    createdAt: toDate(row.createdAt) as Date,
   })) as ReelListRow[]
 }
