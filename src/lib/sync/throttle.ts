@@ -26,7 +26,23 @@ export const MANUAL_SYNC_COOLDOWN_MS = 3_600_000
 
 export type ThrottleVerdict = { allowed: true } | { allowed: false; message: string }
 
-export function checkManualSync(lastAttemptAt: Date | null, now: Date): ThrottleVerdict {
+/**
+ * Контекст вызова меняет только ТЕКСТ отказа, не логику и не порог.
+ *
+ * `'sync'` (по умолчанию) — кнопка «Обновить» у существующего рилса.
+ * `'add'` — `POST /api/reels`, приём ссылки. Одно и то же сообщение
+ * «Обновляли совсем недавно» для обоих контекстов дезинформирует: во втором
+ * человек ничего не обновлял, он вставил ссылку — например, случайно удалил
+ * рилс и возвращает его же обратно. Разные ситуации требуют разных подсказок
+ * (PLAN.md §12: ошибки — человеческим языком, без ближайшего готового текста).
+ */
+export type ThrottleContext = 'sync' | 'add'
+
+export function checkManualSync(
+  lastAttemptAt: Date | null,
+  now: Date,
+  context: ThrottleContext = 'sync',
+): ThrottleVerdict {
   if (!lastAttemptAt) return { allowed: true }
 
   const passed = now.getTime() - lastAttemptAt.getTime()
@@ -35,11 +51,15 @@ export function checkManualSync(lastAttemptAt: Date | null, now: Date): Throttle
   if (passed < 0 || passed >= MANUAL_SYNC_COOLDOWN_MS) return { allowed: true }
 
   const left = Math.max(1, Math.ceil((MANUAL_SYNC_COOLDOWN_MS - passed) / 60_000))
+  const wait = `${left} ${plural(left, ['минуту', 'минуты', 'минут'])}`
 
-  return {
-    allowed: false,
-    message:
-      'Обновляли совсем недавно. Instagram пересчитывает счётчики не чаще ' +
-      `раза в час — загляни через ${left} ${plural(left, ['минуту', 'минуты', 'минут'])}`,
-  }
+  const message =
+    context === 'add'
+      ? 'Этот рилс уже забирали меньше часа назад — например, удалили и вставили ту же ' +
+        'ссылку снова. Instagram пересчитывает счётчики не чаще раза в час, так что новый ' +
+        `заход сейчас спишет кредит впустую. Попробуй добавить через ${wait}`
+      : 'Обновляли совсем недавно. Instagram пересчитывает счётчики не чаще ' +
+        `раза в час — загляни через ${wait}`
+
+  return { allowed: false, message }
 }

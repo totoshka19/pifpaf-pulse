@@ -99,20 +99,43 @@ describe('lastAttemptFor — троттлинг переживает удале�
     expect(await lastAttemptFor(userId, 'НикогдаНеБыло')).toBeNull()
   })
 
-  it('видит попытку по паре пользователь + шорткод', async () => {
-    const at = new Date(Date.now() - 10 * 60_000)
+  it('видит именно ПОСЛЕДНЮЮ попытку по паре, а не любую из её истории', async () => {
+    // Раньше здесь стояла версия, вставлявшая одну строку и проверявшая
+    // только нижнюю границу (found >= at - 1000). Она была зелёной, но
+    // ничего не доказывала: 'SyncStateA' уже несёт более свежую строку из
+    // соседнего describe («triggered_by по умолчанию manual»), и слабый
+    // ассерт не отличал «нашли правильную строку» от «нашли вообще любую
+    // строку не старше порога». ORDER BY started_at DESC оставался
+    // непокрытым — перевёрнутый на ASC, тест остался бы зелёным. Здесь
+    // сортировка проверяется напрямую через точное равенство, на отдельном
+    // шорткоде, чтобы не зависеть от строк из соседних тестов.
+    const code = 'SyncStateOrder'
+    const earlier = new Date(Date.now() - 45 * 60_000)
+    const later = new Date(Date.now() - 5 * 60_000)
+
+    // Вставка НАРОЧНО в обратном порядке относительно времени: свежая по
+    // времени строка вставляется первой, старая — второй. Так тест не
+    // спутать с проверкой «вернулась последняя ВСТАВЛЕННАЯ строка» —
+    // это разные вещи, и ORDER BY started_at DESC обязан вернуть именно
+    // позднюю по ВРЕМЕНИ, а не по порядку вставки.
     await db.insert(syncRuns).values({
-      reelId,
       userId,
-      shortcode: 'SyncStateA',
-      status: 'running',
-      startedAt: at,
+      shortcode: code,
+      status: 'succeeded',
+      startedAt: later,
+    })
+    await db.insert(syncRuns).values({
+      userId,
+      shortcode: code,
+      status: 'succeeded',
+      startedAt: earlier,
     })
 
-    const found = await lastAttemptFor(userId, 'SyncStateA')
+    const found = await lastAttemptFor(userId, code)
 
     expect(found).toBeInstanceOf(Date)
-    expect(found!.getTime()).toBeGreaterThanOrEqual(at.getTime() - 1000)
+    expect(found!.getTime()).toBe(later.getTime())
+    expect(found!.getTime()).not.toBe(earlier.getTime())
   })
 
   it('ДЫРА ЗАКРЫТА: попытка видна после удаления и повторной вставки рилса', async () => {

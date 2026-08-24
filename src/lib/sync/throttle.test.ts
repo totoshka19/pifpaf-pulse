@@ -54,4 +54,25 @@ describe('checkManualSync — троттлинг ручного обновлен
 
     expect(verdict.allowed).toBe(false)
   })
+
+  it('без контекста (кнопка «Обновить») текст не меняется', () => {
+    const verdict = checkManualSync(ago(10 * 60_000), NOW)
+
+    expect(verdict.allowed).toBe(false)
+    if (!verdict.allowed) expect(verdict.message).toContain('Обновляли совсем недавно')
+  })
+
+  it('контекст "add": текст говорит про добавление, а не про "Обновляли"', () => {
+    // POST /api/reels — человек вставил ссылку, а не нажал «Обновить».
+    // «Обновляли совсем недавно» здесь дезинформация: он ничего не обновлял.
+    const verdict = checkManualSync(ago(10 * 60_000), NOW, 'add')
+
+    expect(verdict.allowed).toBe(false)
+    if (!verdict.allowed) {
+      expect(verdict.message).not.toContain('Обновляли')
+      expect(verdict.message).toContain('забирали')
+      expect(verdict.message).toContain('через 50 минут')
+      expect(verdict.message).not.toMatch(/\d{3}/)
+    }
+  })
 })

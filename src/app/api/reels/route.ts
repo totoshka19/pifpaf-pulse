@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     // и разные подсказки. ДО резерва бюджета: за отклонённый запрос кредиты
     // не резервируем.
     const lastAttempt = await lastAttemptFor(session.userId, parsed.shortcode)
-    const throttle = checkManualSync(lastAttempt, new Date())
+    const throttle = checkManualSync(lastAttempt, new Date(), 'add')
     if (!throttle.allowed) return fail(throttle.message, 429)
 
     // Бюджет резервируется ДО запуска прогона. Обратный порядок означает,
