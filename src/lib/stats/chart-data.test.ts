@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PostingSlot } from '@/db/queries/stats-posting-time'
-import { toPostingHeatmap, toViewsSeries } from './chart-data'
+import { toGrowthSeries, toPostingHeatmap, toViewsSeries } from './chart-data'
 
 /**
  * Подготовка рядов для Recharts.
@@ -147,5 +147,44 @@ describe('toPostingHeatmap — насыщенность', () => {
 
     expect(grid).toHaveLength(7)
     expect(grid.every((row) => row.hours.every((h) => h.intensity === 0))).toBe(true)
+  })
+})
+
+describe('toGrowthSeries — график роста одного рилса', () => {
+  const snap = (iso: string, views: number | null) => ({
+    capturedAt: new Date(iso),
+    views,
+    likes: 10,
+    comments: 1,
+  })
+
+  it('подписывает точку днём и часом по Москве', () => {
+    // 16:30 UTC = 19:30 МСК.
+    const series = toGrowthSeries([snap('2026-08-24T16:30:00Z', 1000)])
+
+    expect(series[0].label).toBe('24 авг, 19:30')
+  })
+
+  it('точное число прячет в подпись для тултипа', () => {
+    const series = toGrowthSeries([snap('2026-08-24T16:30:00Z', 1_245_903)])
+
+    expect(series[0].value).toBe(1_245_903)
+    expect(series[0].title).toBe(`1${NBSP}245${NBSP}903`)
+  })
+
+  it('снапшот со скрытыми просмотрами в график не попадает', () => {
+    // null — это «Instagram не отдал число», а не ноль. Точка на нуле
+    // нарисовала бы обвал, которого не было.
+    const series = toGrowthSeries([
+      snap('2026-08-23T16:30:00Z', 1000),
+      snap('2026-08-24T16:30:00Z', null),
+    ])
+
+    expect(series).toHaveLength(1)
+    expect(series[0].value).toBe(1000)
+  })
+
+  it('пустой список не роняет', () => {
+    expect(toGrowthSeries([])).toEqual([])
   })
 })

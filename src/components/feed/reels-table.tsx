@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { ReelCover } from '@/components/reel-cover'
 import type { FeedSort } from '@/lib/reels/filter'
 import type { ReelCardModel } from '@/lib/reels/view-model'
@@ -71,11 +72,12 @@ export function ReelsTable({ cards, highlighted, sort, onSort, onSync, onDelete 
               }`}
             >
               <td className="px-3 py-2">
-                <a
-                  href={card.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                {/* Строка ведёт на экран рилса. Ссылка в Instagram осталась
+                    отдельной кнопкой в колонке действий — см. reel-card.tsx. */}
+                <Link
+                  href={`/app/reels/${card.id}`}
                   className="flex items-center gap-2"
+                  title={`Открыть аналитику: ${card.caption}`}
                 >
                   <span className="w-9 shrink-0">
                     <ReelCover
@@ -87,7 +89,7 @@ export function ReelsTable({ cards, highlighted, sort, onSort, onSync, onDelete 
                     />
                   </span>
                   <span className="line-clamp-1 max-w-[22ch]">{card.caption}</span>
-                </a>
+                </Link>
               </td>
 
               <td className="px-3 py-2 whitespace-nowrap" title={card.postedTitle}>

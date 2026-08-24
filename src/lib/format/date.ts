@@ -84,6 +84,14 @@ export function formatDayMsk(date: Date | null, timeZone = MOSCOW_TZ): string {
   return `${p.day} ${MONTHS_SHORT[p.month - 1]}`
 }
 
+/** «24 авг, 19:30» — подпись оси графика роста, где важен час. */
+export function formatDayHourMsk(date: Date | null, timeZone = MOSCOW_TZ): string {
+  if (!isUsable(date)) return NO_DATA
+
+  const p = partsIn(date, timeZone)
+  return `${p.day} ${MONTHS_SHORT[p.month - 1]}, ${pad(p.hour)}:${pad(p.minute)}`
+}
+
 /**
  * «2026-08-24» → «24 авг».
  *

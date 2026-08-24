@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { NO_DATA } from './number'
-import { formatDayMsk, formatExactMsk, formatIsoDayShort, formatRelative } from './date'
+import {
+  formatDayHourMsk,
+  formatDayMsk,
+  formatExactMsk,
+  formatIsoDayShort,
+  formatRelative,
+} from './date'
 
 /** 24 августа 2026, 16:30 UTC = 19:30 по Москве. */
 const AUG = new Date('2026-08-24T16:30:00Z')
@@ -120,5 +126,21 @@ describe('formatIsoDayShort', () => {
     expect(formatIsoDayShort(null)).toBe(NO_DATA)
     expect(formatIsoDayShort('24.08.2026')).toBe(NO_DATA)
     expect(formatIsoDayShort('2026-13-01')).toBe(NO_DATA)
+  })
+})
+
+describe('formatDayHourMsk — подпись оси графика роста', () => {
+  it('показывает день и час по Москве', () => {
+    // 16:30 UTC — это 19:30 МСК.
+    expect(formatDayHourMsk(AUG)).toBe('24 авг, 19:30')
+  })
+
+  it('переносит дату через полночь по московскому календарю', () => {
+    // 22:30 UTC 24 августа — это уже 01:30 25 августа в Москве.
+    expect(formatDayHourMsk(new Date('2026-08-24T22:30:00Z'))).toBe('25 авг, 01:30')
+  })
+
+  it('нет даты — прочерк', () => {
+    expect(formatDayHourMsk(null)).toBe(NO_DATA)
   })
 })

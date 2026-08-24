@@ -36,3 +36,8 @@ export const LazyViewsChart = dynamic(
   () => import('./views-chart').then((m) => m.ViewsChart),
   { ssr: false, loading: () => <ChartPlaceholder height="h-64" /> },
 )
+
+export const LazyGrowthChart = dynamic(
+  () => import('./growth-chart').then((m) => m.GrowthChart),
+  { ssr: false, loading: () => <ChartPlaceholder height="h-64" /> },
+)

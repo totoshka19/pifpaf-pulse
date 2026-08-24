@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { ReelCover } from '@/components/reel-cover'
 import type { ReelCardModel } from '@/lib/reels/view-model'
 
@@ -23,12 +24,14 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
       }`}
     >
       <div className="relative">
-        <a
-          href={card.url}
-          target="_blank"
-          rel="noopener noreferrer"
+        {/* Обложка ведёт на экран рилса, а не в Instagram. Ссылка в Instagram
+            никуда не делась — она отдельной кнопкой ниже и на самом экране:
+            это было единственное назначение клика до среза 6, и молча
+            подменить его значило бы отобрать привычное действие. */}
+        <Link
+          href={`/app/reels/${card.id}`}
           className="block transition-transform duration-200 hover:-translate-y-0.5"
-          title={`Открыть в Instagram: ${card.caption}`}
+          title={`Открыть аналитику: ${card.caption}`}
         >
           <ReelCover
             reelId={card.id}
@@ -46,7 +49,7 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
             </p>
             <p className="text-[11px] text-white/70">просмотров</p>
           </div>
-        </a>
+        </Link>
 
         {card.growth && (
           <span
@@ -92,6 +95,15 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
             {card.canRetry ? 'Повторить' : 'Обновить'}
           </button>
         )}
+
+        <a
+          href={card.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs hover:bg-[var(--accent-soft)]"
+        >
+          В Instagram
+        </a>
 
         <button
           type="button"

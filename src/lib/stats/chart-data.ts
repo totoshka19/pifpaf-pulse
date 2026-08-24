@@ -1,6 +1,7 @@
 import type { PostingSlot } from '@/db/queries/stats-posting-time'
 import type { TimeseriesPoint } from '@/db/queries/stats-timeseries'
-import { formatIsoDayShort } from '@/lib/format/date'
+import type { DetailSnapshot } from '@/db/queries/reel-detail'
+import { formatDayHourMsk, formatIsoDayShort } from '@/lib/format/date'
 import { formatExact } from '@/lib/format/number'
 
 /**
@@ -30,6 +31,24 @@ export function toViewsSeries(points: TimeseriesPoint[]): ChartPoint[] {
     value: point.totalViews,
     title: formatExact(point.totalViews),
   }))
+}
+
+/**
+ * Точки графика роста одного рилса.
+ *
+ * Снапшоты со скрытыми просмотрами ОТБРАСЫВАЮТСЯ, а не превращаются в ноль:
+ * `null` означает «Instagram не отдал число» (лайки бывают скрыты, метрики
+ * приходят частично), и точка на нуле нарисовала бы обвал, которого не было.
+ * Пропуск честнее: линия просто соединит соседние известные замеры.
+ */
+export function toGrowthSeries(snapshots: DetailSnapshot[]): ChartPoint[] {
+  return snapshots
+    .filter((snapshot): snapshot is DetailSnapshot & { views: number } => snapshot.views !== null)
+    .map((snapshot) => ({
+      label: formatDayHourMsk(snapshot.capturedAt),
+      value: snapshot.views,
+      title: formatExact(snapshot.views),
+    }))
 }
 
 export type HeatmapCell = {
