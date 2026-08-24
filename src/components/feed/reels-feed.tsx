@@ -101,7 +101,12 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
       // с новой лестницей задержек.
       if (results.some((reel) => reel && reel.syncStatus !== 'pending')) {
         // refresh объявлена ниже как function-декларация: она поднимается
-        // (hoisting) и к моменту вызова уже существует.
+        // (hoisting) и к моменту вызова уже существует. Правило компилятора
+        // не видит поднятие и требует явного disable — подтверждено
+        // мутационной проверкой задачи 10 (см. отчёт): пока refresh()
+        // вызывается ТОЛЬКО отсюда, правило падает здесь предсказуемо;
+        // отключать эту строку молча небезопасно.
+        // eslint-disable-next-line react-hooks/immutability
         await refresh()
         return
       }
@@ -140,10 +145,32 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
 
   async function onSync(id: string) {
     // Оптимистично переводим карточку в «обновляем»: цифры на экране остаются,
-    // потому что метрики живут в снапшотах, а не в строке рилса.
+    // потому что метрики живут в снапшотах, а не в строке рилса. Запоминаем
+    // прежний статус здесь же, из текущего rows — он понадобится, только если
+    // запрос не удастся.
+    const previousStatus = rows.find((row) => row.id === id)?.syncStatus
+
     setRows((prev) =>
       prev.map((row) => (row.id === id ? { ...row, syncStatus: 'pending' } : row)),
     )
+
+    // Откат — локальный, не через refresh(): второй запрос ненадёжен именно
+    // тогда, когда нужнее всего. Если сеть легла, refresh() тоже упадёт и
+    // молча проглотит свою ошибку (см. её catch выше по файлу), и карточка
+    // так и останется висеть в «Обновляем…» до перезагрузки страницы — хуже,
+    // чем локальный откат. Восстанавливаем статус, только если он всё ещё
+    // ровно тот, что мы сами выставили: если рилс успели удалить или его
+    // строку заново принёс другой refresh (например, опрос соседнего
+    // pending-рилса), функциональный апдейтер это не тронет — не затираем
+    // более свежее состояние своим старым снимком.
+    const restorePreviousStatus = () =>
+      setRows((prev) =>
+        prev.map((row) =>
+          row.id === id && row.syncStatus === 'pending' && previousStatus !== undefined
+            ? { ...row, syncStatus: previousStatus }
+            : row,
+        ),
+      )
 
     try {
       const response = await fetch(`/api/reels/${id}/sync`, { method: 'POST' })
@@ -151,14 +178,14 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
       if (!response.ok) {
         const data = await response.json().catch(() => null)
         push(data?.error ?? 'Не получилось обновить рилс', 'error')
-        await refresh()
+        restorePreviousStatus()
         return
       }
 
       push('Обновляем — цифры подтянутся через пару секунд')
     } catch {
       push('Не получилось связаться с сервером. Проверь интернет', 'error')
-      await refresh()
+      restorePreviousStatus()
     }
   }
 
@@ -168,8 +195,14 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
 
     setPendingDelete(null)
 
-    // Оптимистичное удаление: карточка исчезает сразу.
-    const snapshot = rows
+    // Оптимистичное удаление: карточка исчезает сразу. Запоминаем саму
+    // строку, а не весь rows целиком: снапшот всего списка замораживает
+    // состояние на момент клика, а пока DELETE летит, rows может честно
+    // измениться из другого места — опрос увидел, что СОСЕДНИЙ рилс вышел
+    // из pending, и вызвал refresh(), или onAdded дописал новую строку.
+    // Полная подмена rows этим старым снимком при неудаче стёрла бы то,
+    // что успело поменяться параллельно.
+    const removed = rows.find((row) => row.id === id)
     setRows((prev) => prev.filter((row) => row.id !== id))
 
     try {
@@ -178,9 +211,15 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
 
       push('Рилс удалён')
     } catch {
-      // Не получилось — возвращаем список как было. Молча «потерять» рилс
-      // и оставить его в базе хуже, чем показать ошибку.
-      setRows(snapshot)
+      // Не получилось — возвращаем рилс обратно, но реконструируем текущий
+      // rows функциональным апдейтером, а не подменяем его целиком старым
+      // снимком. Место в массиве неважно: applyFeed сортирует при каждом
+      // рендере, порядок отображения производный, а не то, что хранится
+      // в rows. prev.some(...) страхует от повторной вставки, если строка
+      // с этим id к этому моменту уже как-то оказалась на месте.
+      setRows((prev) =>
+        !removed || prev.some((row) => row.id === id) ? prev : [...prev, removed],
+      )
       push('Не получилось удалить рилс. Он остался на месте', 'error')
     }
   }
