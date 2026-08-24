@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { ToastStack, useToasts } from '@/components/ui/toast'
 import type { ReelListRow } from '@/db/queries/list-reels'
 import { applyFeed, DEFAULT_FEED_STATE, type FeedState } from '@/lib/reels/filter'
 import { reviveRow } from '@/lib/reels/parse'
@@ -99,9 +101,7 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
       // с новой лестницей задержек.
       if (results.some((reel) => reel && reel.syncStatus !== 'pending')) {
         // refresh объявлена ниже как function-декларация: она поднимается
-        // (hoisting) и к моменту вызова уже существует. Правило компилятора
-        // не видит поднятие и требует явного disable.
-        // eslint-disable-next-line react-hooks/immutability
+        // (hoisting) и к моменту вызова уже существует.
         await refresh()
         return
       }
@@ -135,25 +135,77 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
     }
   }
 
-  // Управление, форма и мутации подключаются в задачах 8–10.
-  const onSync = (id: string) => void id
-  const onDelete = (id: string) => setRows((prev) => prev.filter((row) => row.id !== id))
+  const { toasts, push } = useToasts()
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+
+  async function onSync(id: string) {
+    // Оптимистично переводим карточку в «обновляем»: цифры на экране остаются,
+    // потому что метрики живут в снапшотах, а не в строке рилса.
+    setRows((prev) =>
+      prev.map((row) => (row.id === id ? { ...row, syncStatus: 'pending' } : row)),
+    )
+
+    try {
+      const response = await fetch(`/api/reels/${id}/sync`, { method: 'POST' })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        push(data?.error ?? 'Не получилось обновить рилс', 'error')
+        await refresh()
+        return
+      }
+
+      push('Обновляем — цифры подтянутся через пару секунд')
+    } catch {
+      push('Не получилось связаться с сервером. Проверь интернет', 'error')
+      await refresh()
+    }
+  }
+
+  async function confirmDelete() {
+    const id = pendingDelete
+    if (!id) return
+
+    setPendingDelete(null)
+
+    // Оптимистичное удаление: карточка исчезает сразу.
+    const snapshot = rows
+    setRows((prev) => prev.filter((row) => row.id !== id))
+
+    try {
+      const response = await fetch(`/api/reels/${id}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error()
+
+      push('Рилс удалён')
+    } catch {
+      // Не получилось — возвращаем список как было. Молча «потерять» рилс
+      // и оставить его в базе хуже, чем показать ошибку.
+      setRows(snapshot)
+      push('Не получилось удалить рилс. Он остался на месте', 'error')
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Лента</h1>
 
       <AddReelForm
-        onAdded={(row) => setRows((prev) => [row, ...prev])}
+        onAdded={(row) => {
+          setRows((prev) => [row, ...prev])
+          push('Добавили! Забираем данные из Instagram')
+        }}
         onDuplicate={(id) => {
+          push('Этот рилс уже добавлен')
           setHighlighted(id)
           document.getElementById(`reel-${id}`)?.scrollIntoView({
-            behavior: 'smooth',
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+              ? 'auto'
+              : 'smooth',
             block: 'center',
           })
           setTimeout(() => setHighlighted(null), 2500)
         }}
-        onError={(message) => console.error(message)}
+        onError={(message) => push(message, 'error')}
       />
 
       <FeedControls
@@ -171,12 +223,28 @@ export function ReelsFeed({ initialRows, serverNow }: Props) {
           sort={feedState.sort}
           onSort={(sort) => setFeedState((prev) => ({ ...prev, sort }))}
           onSync={onSync}
-          onDelete={onDelete}
+          onDelete={setPendingDelete}
           highlighted={highlighted}
         />
       ) : (
-        <ReelsGrid cards={cards} onSync={onSync} onDelete={onDelete} highlighted={highlighted} />
+        <ReelsGrid
+          cards={cards}
+          onSync={onSync}
+          onDelete={setPendingDelete}
+          highlighted={highlighted}
+        />
       )}
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Удалить рилс?"
+        text="Пропадут и метрики, и вся история просмотров по нему. Отменить не получится."
+        confirmLabel="Удалить"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
+
+      <ToastStack toasts={toasts} />
     </div>
   )
 }
