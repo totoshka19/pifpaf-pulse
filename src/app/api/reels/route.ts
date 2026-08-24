@@ -39,18 +39,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const session = await requireSession()
-
-    // Добавление рилса ТОЖЕ запускает прогон и тоже стоит кредита.
-    // Ограничить только кнопку «Обновить» значило бы оставить открытой
-    // вторую дверь — ровно ту, через которую утекает бюджет в сценарии
-    // «удалил → вставил заново».
-    const attempts = await manualAttemptsSince(
-      session.userId,
-      new Date(Date.now() - USER_SYNC_WINDOW_MS),
-    )
-    const rate = checkUserRate(attempts, new Date())
-    if (!rate.allowed) return fail(rate.message, 429)
-
     const body = await request.json().catch(() => null)
 
     const parsed = normalizeReelUrl(typeof body?.url === 'string' ? body.url : '')
@@ -66,6 +54,26 @@ export async function POST(request: Request) {
       // Отдаём id, чтобы интерфейс мог подсветить уже существующую карточку.
       return ok({ id: existing.id, duplicate: true, error: 'Этот рилс уже добавлен' }, 409)
     }
+
+    // Добавление рилса ТОЖЕ запускает прогон и тоже стоит кредита.
+    // Ограничить только кнопку «Обновить» значило бы оставить открытой
+    // вторую дверь — ровно ту, через которую утекает бюджет в сценарии
+    // «удалил → вставил заново».
+    //
+    // ПОСЛЕ дедупа, и вот почему это важно, а не только «для симметрии» с
+    // часовым троттлингом ниже. Ветка дедупа не тратит бюджет: она выходит
+    // раньше tryReserve и раньше вставки рилса, прогон Apify не стартует.
+    // Гейтить бесплатную ветку лимитом, который существует ради защиты
+    // бюджета, противоречит смыслу самого лимита. И честность ответа: у
+    // человека с исчерпанным лимитом, добавляющего уже добавленный рилс,
+    // ожидание ничего не изменит — рилс всё равно останется добавленным.
+    // 409 «уже добавлен» — правда, 429 «подожди» здесь было бы враньём.
+    const attempts = await manualAttemptsSince(
+      session.userId,
+      new Date(Date.now() - USER_SYNC_WINDOW_MS),
+    )
+    const rate = checkUserRate(attempts, new Date())
+    if (!rate.allowed) return fail(rate.message, 429)
 
     // Тот же часовой троттлинг, что у кнопки «Обновить», и по тому же ключу.
     // Здесь он и есть настоящее лекарство от дыры «удалил → вставил заново»:
