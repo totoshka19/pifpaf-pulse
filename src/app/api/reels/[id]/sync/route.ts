@@ -1,6 +1,7 @@
-import { desc, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db, reels, syncRuns } from '@/db'
 import { tryReserve } from '@/db/queries/budget'
+import { lastAttemptFor } from '@/db/queries/sync-state'
 import { fail, handleError, ok } from '@/lib/api/respond'
 import { isMock, startRun } from '@/lib/apify/client'
 import { assertOwned } from '@/lib/auth/ownership'
@@ -38,14 +39,13 @@ export async function POST(
     // Провалившийся прогон lastSyncedAt не трогает, а кредит Apify уже потрачен —
     // троттлить по lastSyncedAt значило бы никогда не троттлить кнопку «Повторить»
     // у рилсов в failed. Не «упрощать» обратно на reel.lastSyncedAt.
-    const [lastRun] = await db
-      .select({ startedAt: syncRuns.startedAt })
-      .from(syncRuns)
-      .where(eq(syncRuns.reelId, reel.id))
-      .orderBy(desc(syncRuns.startedAt))
-      .limit(1)
+    //
+    // Ключ — ПАРА (user_id, shortcode), а не reel_id. Разница видна ровно
+    // в одном сценарии, и он же был дырой: удалить рилс и вставить ту же
+    // ссылку заново. Новый reel_id не помнил ничего, пара помнит.
+    const lastAttempt = await lastAttemptFor(session.userId, reel.shortcode)
 
-    const verdict = checkManualSync(lastRun?.startedAt ?? null, new Date())
+    const verdict = checkManualSync(lastAttempt, new Date())
     if (!verdict.allowed) return fail(verdict.message, 429)
 
     // Бюджет резервируется ДО запуска. Обратный порядок означает, что при

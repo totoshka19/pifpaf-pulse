@@ -2,10 +2,12 @@ import { and, eq } from 'drizzle-orm'
 import { db, reels, syncRuns } from '@/db'
 import { tryReserve } from '@/db/queries/budget'
 import { listReels, type ReelSort } from '@/db/queries/list-reels'
+import { lastAttemptFor } from '@/db/queries/sync-state'
 import { fail, handleError, ok } from '@/lib/api/respond'
 import { isMock, startRun } from '@/lib/apify/client'
 import { requireSession } from '@/lib/auth/require-session'
 import { normalizeReelUrl } from '@/lib/instagram/normalize-url'
+import { checkManualSync } from '@/lib/sync/throttle'
 
 export const runtime = 'nodejs'
 
@@ -51,6 +53,18 @@ export async function POST(request: Request) {
       // Отдаём id, чтобы интерфейс мог подсветить уже существующую карточку.
       return ok({ id: existing.id, duplicate: true, error: 'Этот рилс уже добавлен' }, 409)
     }
+
+    // Тот же часовой троттлинг, что у кнопки «Обновить», и по тому же ключу.
+    // Здесь он и есть настоящее лекарство от дыры «удалил → вставил заново»:
+    // рилс новый, id новый, но пара (user_id, shortcode) помнит попытку.
+    //
+    // Порядок важен. ПОСЛЕ дедупа: существующий рилс обязан по-прежнему
+    // отвечать «уже добавлен», а не «слишком часто» — это разные ситуации
+    // и разные подсказки. ДО резерва бюджета: за отклонённый запрос кредиты
+    // не резервируем.
+    const lastAttempt = await lastAttemptFor(session.userId, parsed.shortcode)
+    const throttle = checkManualSync(lastAttempt, new Date())
+    if (!throttle.allowed) return fail(throttle.message, 429)
 
     // Бюджет резервируется ДО запуска прогона. Обратный порядок означает,
     // что при исчерпанном лимите кредиты уже потрачены, а узнаём мы после.
