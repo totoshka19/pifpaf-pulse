@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { plural } from '@/lib/format/plural'
 import type { FeedRange, FeedSort, FeedState, FeedView } from '@/lib/reels/filter'
 
@@ -33,6 +34,29 @@ const select =
 
 export function FeedControls({ state, onChange, total, shown }: Props) {
   const patch = (part: Partial<FeedState>) => onChange({ ...state, ...part })
+
+  // role="radio" сама по себе меняет только то, что слышит скринридер —
+  // клавиатурное поведение нативного <input type="radio"> (стрелки, один
+  // Tab-стоп на группу) она не даёт. Roving tabIndex и обработчик стрелок
+  // ниже подключены руками: без них Tab останавливался бы на обеих кнопках,
+  // а стрелки не делали бы вообще ничего, хотя скринридер уже объявил бы
+  // «radio group, 1 of 2» и подготовил пользователя именно к такому вводу.
+  const viewRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  const selectView = (index: number) => {
+    patch({ view: VIEWS[index].value })
+    viewRefs.current[index]?.focus()
+  }
+
+  const onViewKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault()
+      selectView((index + 1) % VIEWS.length)
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      selectView((index - 1 + VIEWS.length) % VIEWS.length)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -73,15 +97,22 @@ export function FeedControls({ state, onChange, total, shown }: Props) {
         </select>
 
         {/* Переключатель вида — radiogroup, а не две кнопки: так он озвучивается
-            скринридером как один выбор из двух, и стрелки работают сами. */}
+            скринридером как один выбор из двух, а не два независимых действия.
+            Стрелки и roving tabIndex у кнопок ниже — ручная реализация APG
+            radio pattern, роль сама по себе их не даёт (см. комментарий выше). */}
         <div role="radiogroup" aria-label="Вид ленты" className="flex rounded-xl bg-white p-1">
-          {VIEWS.map((item) => (
+          {VIEWS.map((item, index) => (
             <button
               key={item.value}
+              ref={(el) => {
+                viewRefs.current[index] = el
+              }}
               type="button"
               role="radio"
               aria-checked={state.view === item.value}
-              onClick={() => patch({ view: item.value })}
+              tabIndex={state.view === item.value ? 0 : -1}
+              onClick={() => selectView(index)}
+              onKeyDown={(event) => onViewKeyDown(event, index)}
               className={`rounded-lg px-3 py-1.5 text-sm transition ${
                 state.view === item.value
                   ? 'bg-[var(--accent-soft)] font-medium'

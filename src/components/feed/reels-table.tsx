@@ -29,12 +29,20 @@ export function ReelsTable({ cards, sort, onSort, onSync, onDelete }: Props) {
         <thead className="bg-[var(--accent-soft)]/40 text-left text-xs text-[var(--muted)]">
           <tr>
             <th className="px-3 py-2 font-medium">Рилс</th>
+            {/* aria-sort объявлен для роли columnheader, то есть для <th>.
+                На <button> внутри него он не читается вспомогательными
+                технологиями вообще: сортировка выглядела бы объявленной,
+                а на деле незрячий пользователь не узнал бы ни колонку,
+                ни направление — стрелка отдельно помечена aria-hidden. */}
             {SORTABLE.map((column) => (
-              <th key={column.key} className="px-3 py-2 font-medium">
+              <th
+                key={column.key}
+                aria-sort={sort === column.key ? 'descending' : 'none'}
+                className="px-3 py-2 font-medium"
+              >
                 <button
                   type="button"
                   onClick={() => onSort(column.key)}
-                  aria-sort={sort === column.key ? 'descending' : 'none'}
                   className="flex items-center gap-1 hover:text-[var(--ink)]"
                 >
                   {column.label}
