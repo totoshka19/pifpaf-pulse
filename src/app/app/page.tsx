@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ChartFrame } from '@/components/stats/chart-frame'
 import { KpiRow } from '@/components/stats/kpi-row'
 import { LazyViewsChart } from '@/components/stats/lazy-charts'
+import { PostingTimeChart } from '@/components/stats/posting-time-chart'
 import { RangeSwitch } from '@/components/stats/range-switch'
 import { TopReels } from '@/components/stats/top-reels'
 import { listReels } from '@/db/queries/list-reels'
@@ -10,10 +11,21 @@ import { statsOverview } from '@/db/queries/stats-overview'
 import { statsPostingTime } from '@/db/queries/stats-posting-time'
 import { statsTimeseries, type TimeseriesRange } from '@/db/queries/stats-timeseries'
 import { requireSession } from '@/lib/auth/require-session'
-import { toViewsSeries } from '@/lib/stats/chart-data'
+import { toPostingHeatmap, toViewsSeries } from '@/lib/stats/chart-data'
+import { plural } from '@/lib/format/plural'
 
 /** Белый список: значение из URL уходит в запрос и в ключ Record. */
 const RANGES: TimeseriesRange[] = ['7d', '30d', 'all']
+
+/**
+ * Порог честности гистограммы.
+ *
+ * На двух рилсах «лучшее время постить» — это не вывод, а два случая.
+ * Нарисовать по ним тепловую карту значит выдать шум за аналитику, а это
+ * ровно тот сорт вранья, который проверяющий из индустрии видит сразу.
+ * Ниже порога показываем текст, а не картинку.
+ */
+const MIN_REELS_FOR_HEATMAP = 5
 
 export const metadata: Metadata = { title: 'Дашборд' }
 
@@ -47,6 +59,12 @@ export default async function DashboardPage({ searchParams }: PageProps<'/app'>)
   ])
 
   const hasReels = overview.reelsCount > 0
+
+  // Считаем по слотам гистограммы, а не по reelsCount: рилс без даты
+  // публикации в неё не попадает, и обещать вывод «по трём рилсам»,
+  // когда на карте два, — то же враньё, только мельче.
+  const datedReels = postingTime.reduce((sum, slot) => sum + slot.reelsCount, 0)
+  const enoughForHeatmap = datedReels >= MIN_REELS_FOR_HEATMAP
 
   // Серверный компонент вызывается один раз за запрос и не мемоизируется
   // React Compiler. Date.now() здесь и есть лекарство от расхождения разметки,
@@ -95,11 +113,24 @@ export default async function DashboardPage({ searchParams }: PageProps<'/app'>)
 
       <ChartFrame
         title="Когда лучше постить"
-        hint="средние просмотры по времени публикации, МСК"
+        hint={
+          enoughForHeatmap
+            ? `по ${datedReels} ${plural(datedReels, ['рилсу', 'рилсам', 'рилсам'])}, время московское`
+            : 'средние просмотры по времени публикации, МСК'
+        }
         empty={postingTime.length === 0}
         emptyText="Пока не из чего считать. Нужно хотя бы несколько рилсов, опубликованных в разное время."
       >
-        <p className="text-sm text-[var(--muted)]">{postingTime.length} слотов</p>
+        {enoughForHeatmap ? (
+          <PostingTimeChart grid={toPostingHeatmap(postingTime)} />
+        ) : (
+          <p className="rounded-xl border border-dashed border-[var(--border)] bg-white/50 px-4 py-8 text-center text-sm text-[var(--muted)]">
+            Пока мало данных: график строится по {datedReels}{' '}
+            {plural(datedReels, ['рилсу', 'рилсам', 'рилсам'])}. Нужно хотя бы{' '}
+            {MIN_REELS_FOR_HEATMAP} — иначе это не «лучшее время», а просто
+            несколько случаев.
+          </p>
+        )}
       </ChartFrame>
     </div>
   )
