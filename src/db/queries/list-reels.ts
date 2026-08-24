@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { db } from '@/db'
+import { rowsOf, toDate, toNumber } from './coerce'
 
 export type ReelSort = 'added' | 'date' | 'views' | 'growth'
 
@@ -21,45 +22,6 @@ export type ReelListRow = {
   createdAt: Date
   /** Прирост просмотров за 7 дней. `null` — точек в окне меньше двух. */
   growth7d: number | null
-}
-
-/**
- * BIGINT приходит из postgres.js СТРОКОЙ.
- *
- * Замер 2026-08-24 на живой базе: `SELECT 1234::bigint` даёт `"1234"`,
- * `1234::int` — `1234`. Драйвер поступает так намеренно: int8 вмещает больше
- * Number.MAX_SAFE_INTEGER, и молчаливая потеря точности хуже строки.
- *
- * Типизированный путь Drizzle (`db.select().from(...)`) применяет собственный
- * маппер и отдаёт число; расходится только сырой `db.execute` — то есть ровно
- * тот путь, которым в этом проекте написаны аналитические запросы.
- *
- * Number() здесь безопасен: самый просматриваемый рилс в выгрузке —
- * 14 123 499, до 2^53 запас в шесть порядков.
- */
-function toNumber(value: unknown): number | null {
-  if (value === null || value === undefined) return null
-
-  const parsed = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-/**
- * Тот же класс проблемы, что и с BIGINT выше: `db.execute()` отдаёт
- * timestamptz строкой в текстовом формате Postgres («2026-08-17 18:33:12+00»),
- * а не объектом Date, — типизированный маппер Drizzle сюда не дотягивается.
- * `ReelListRow` обещает `Date`, и на этом обещании держится форматирование
- * (`formatRelative` проверяет `instanceof Date`) и сортировка ленты по
- * умолчанию (`row.createdAt.getTime()` без защитной проверки). Без приведения
- * карточка молча показывает «—» вместо даты, а лента из двух и более рилсов
- * падает с TypeError при первом же рендере — воспроизведено вручную в браузере.
- */
-function toDate(value: unknown): Date | null {
-  if (value === null || value === undefined) return null
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value
-
-  const parsed = new Date(value as string)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
 /**
@@ -145,12 +107,7 @@ export async function listReels(userId: string, sort: ReelSort = 'added') {
     ORDER BY ${ORDER[sort] ?? ORDER.added}
   `)
 
-  const raw = (Array.isArray(rows) ? rows : ((rows as { rows?: unknown[] }).rows ?? [])) as Record<
-    string,
-    unknown
-  >[]
-
-  return raw.map((row) => ({
+  return rowsOf(rows).map((row) => ({
     ...row,
     views: toNumber(row.views),
     likes: toNumber(row.likes),
