@@ -5,17 +5,23 @@ import type { ReelCardModel } from '@/lib/reels/view-model'
 
 type Props = {
   card: ReelCardModel
+  highlighted?: boolean
   /** Первые карточки грузят обложку сразу, остальные лениво. */
   priority?: boolean
   onSync: (id: string) => void
   onDelete: (id: string) => void
 }
 
-export function ReelCard({ card, priority = false, onSync, onDelete }: Props) {
+export function ReelCard({ card, highlighted = false, priority = false, onSync, onDelete }: Props) {
   const busy = card.state === 'loading' || card.state === 'refreshing'
 
   return (
-    <article className="group flex flex-col gap-2">
+    <article
+      id={`reel-${card.id}`}
+      className={`group flex flex-col gap-2 rounded-[var(--radius)] transition-shadow duration-500 ${
+        highlighted ? 'ring-2 ring-[var(--accent)] ring-offset-2' : ''
+      }`}
+    >
       <div className="relative">
         <a
           href={card.url}

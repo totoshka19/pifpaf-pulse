@@ -6,6 +6,7 @@ import type { ReelCardModel } from '@/lib/reels/view-model'
 
 type Props = {
   cards: ReelCardModel[]
+  highlighted: string | null
   sort: FeedSort
   onSort: (sort: FeedSort) => void
   onSync: (id: string) => void
@@ -19,7 +20,7 @@ const SORTABLE: { key: FeedSort; label: string }[] = [
   { key: 'growth', label: 'За неделю' },
 ]
 
-export function ReelsTable({ cards, sort, onSort, onSync, onDelete }: Props) {
+export function ReelsTable({ cards, highlighted, sort, onSort, onSync, onDelete }: Props) {
   return (
     // Горизонтальная прокрутка — единственный честный способ показать девять
     // колонок на экране в 375 px. Схлопывать таблицу в карточки бессмысленно:
@@ -62,7 +63,13 @@ export function ReelsTable({ cards, sort, onSort, onSync, onDelete }: Props) {
 
         <tbody>
           {cards.map((card) => (
-            <tr key={card.id} className="border-t border-[var(--border)] hover:bg-[var(--bg)]/60">
+            <tr
+              key={card.id}
+              id={`reel-${card.id}`}
+              className={`border-t border-[var(--border)] hover:bg-[var(--bg)]/60 ${
+                highlighted === card.id ? 'bg-[var(--accent-soft)]' : ''
+              }`}
+            >
               <td className="px-3 py-2">
                 <a
                   href={card.url}
