@@ -58,13 +58,39 @@ export async function POST(
       )
     }
 
-    const run = await startRun([reel.url])
+    // Строка sync_runs пишется ДО startRun, а не после. Троттлинг выше читает
+    // MAX(sync_runs.started_at) как время последней ПОПЫТКИ — если startRun
+    // бросит исключение (Apify недоступен, токен отозван), обратный порядок
+    // оставил бы попытку незарегистрированной: кредит уже списан tryReserve,
+    // клиент откатит карточку в ok, и следующий клик снова пройдёт троттлинг
+    // и снова спишет кредит — без счётчика между ними вообще нет.
+    const [pendingRun] = await db
+      .insert(syncRuns)
+      .values({ reelId: reel.id, apifyRunId: null, status: 'running' })
+      .returning({ id: syncRuns.id })
 
-    await db.insert(syncRuns).values({
-      reelId: reel.id,
-      apifyRunId: run.runId,
-      status: run.status === 'FAILED' ? 'failed' : 'running',
-    })
+    let run
+    try {
+      run = await startRun([reel.url])
+    } catch (error) {
+      await db
+        .update(syncRuns)
+        .set({
+          status: 'failed',
+          error: 'Не получилось запустить прогон Apify',
+          finishedAt: new Date(),
+        })
+        .where(eq(syncRuns.id, pendingRun.id))
+      throw error
+    }
+
+    await db
+      .update(syncRuns)
+      .set({
+        apifyRunId: run.runId,
+        status: run.status === 'FAILED' ? 'failed' : 'running',
+      })
+      .where(eq(syncRuns.id, pendingRun.id))
 
     await db
       .update(reels)
