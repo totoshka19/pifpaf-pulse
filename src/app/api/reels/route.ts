@@ -83,7 +83,14 @@ export async function POST(request: Request) {
     // не было и не будет» и никогда не предложит «Повторить».
     const [pendingRun] = await db
       .insert(syncRuns)
-      .values({ reelId: reel.id, apifyRunId: null, status: 'running' })
+      .values({
+        reelId: reel.id,
+        userId: session.userId,
+        shortcode: reel.shortcode,
+        triggeredBy: 'manual',
+        apifyRunId: null,
+        status: 'running',
+      })
       .returning({ id: syncRuns.id })
 
     let run

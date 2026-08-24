@@ -66,7 +66,14 @@ export async function POST(
     // и снова спишет кредит — без счётчика между ними вообще нет.
     const [pendingRun] = await db
       .insert(syncRuns)
-      .values({ reelId: reel.id, apifyRunId: null, status: 'running' })
+      .values({
+        reelId: reel.id,
+        userId: session.userId,
+        shortcode: reel.shortcode,
+        triggeredBy: 'manual',
+        apifyRunId: null,
+        status: 'running',
+      })
       .returning({ id: syncRuns.id })
 
     let run
