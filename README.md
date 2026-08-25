@@ -1,36 +1,156 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PifPaf Pulse
 
-## Getting Started
+Аналитика рилсов для внутренних блогеров PifPaf AI. Вставляешь ссылку из
+Instagram — просмотры, лайки, комментарии, дата и обложка подтягиваются сами
+и **обновляются дальше по расписанию, без единого нажатия**.
 
-First, run the development server:
+**Работающий сайт:** https://iridescent-biscuit-442fa5.netlify.app
+
+**Демо-кабинет:** на главной кнопка «Посмотреть демо» — вход без регистрации,
+внутри три настоящих рилса с историей роста за три недели. Можно добавлять
+свои ссылки, ничего не сломается. Если удобнее войти формой:
+`demo@example.com` / `pulse-demo-2026`.
+
+---
+
+## Что внутри
+
+**Лендинг** → **вход/регистрация** → кабинет из трёх разделов:
+
+- **`/app` — дашборд.** Строка KPI, топ-3 рилса, график динамики просмотров
+  с переключателем 7д/30д/всё и тепловая карта «когда лучше постить» —
+  по московскому времени.
+- **`/app/reels` — лента.** Переключатель «сетка ↔ таблица», добавление ссылки
+  (в том числе из буфера), поиск, сортировки, фильтр периода, ручное
+  обновление и удаление с подтверждением.
+- **`/app/reels/:id` — экран рилса.** Метрики, график роста по снапшотам и лог
+  синхронизаций: видно, когда сервис ходил за цифрами и чем это кончилось.
+- **`/app/settings` — кабинет.** Имя, инстаграм-хендл, смена пароля, сводка
+  за всё время.
+
+Тёмная тема — за системной. Интерфейс собран под телефон в первую очередь.
+
+## Стек и почему именно он
+
+**TypeScript · Next.js 16 (App Router) · PostgreSQL (Neon) · Drizzle ORM ·
+Tailwind 4 · Recharts · Vitest · Apify API · Netlify**
+
+Три решения, которые стоит объяснить:
+
+- **Drizzle, а не Prisma.** Prisma прячет SQL за генератором, а в задании
+  просили «джаваскрипт, скл» — значит SQL должен быть виден. Drizzle отдаёт
+  типизацию, но не мешает писать запросы руками.
+- **`jose`, а не `jsonwebtoken`.** `jose` не зависит от Node API, поэтому
+  запасной деплой на Cloudflare Workers остаётся возможным без переписывания
+  авторизации.
+- **Обложки в своей базе, а не ссылкой на CDN Instagram.** Замерено: ссылки
+  живут около 4,5 суток, дальше карточки превратились бы в серые квадраты.
+  Картинка ужимается `sharp` в WebP 480px (70 КБ вместо 338 КБ) и лежит в
+  `bytea`, отдаётся со своего домена с иммутабельным кешем.
+
+## Сырой SQL — где смотреть
+
+Аналитика написана руками, отдельными файлами с разбором каждого решения:
+
+| Файл | Что делает |
+|---|---|
+| [`stats-timeseries.ts`](src/db/queries/stats-timeseries.ts) | динамика по дням с протягиванием пропусков: `generate_series` для дней без замеров, `DISTINCT ON` за последним снапшотом дня |
+| [`stats-overview.ts`](src/db/queries/stats-overview.ts) | KPI и прирост за неделю |
+| [`stats-posting-time.ts`](src/db/queries/stats-posting-time.ts) | гистограмма «когда постить», группировка в `Europe/Moscow` |
+| [`list-reels.ts`](src/db/queries/list-reels.ts) | лента: `DISTINCT ON` за последним снапшотом, `growth7d` оконной функцией |
+| [`reel-detail.ts`](src/db/queries/reel-detail.ts) | рилс со снапшотами и логом прогонов |
+| [`sync-state.ts`](src/db/queries/sync-state.ts) | выборка «кому пора обновиться», счётчики попыток |
+| [`budget.ts`](src/db/queries/budget.ts) | атомарный резерв бюджета Apify одним запросом |
+
+Схема — [`src/db/schema.ts`](src/db/schema.ts), миграции —
+[`src/db/migrations/`](src/db/migrations/). CHECK-ограничения стоят в базе, а
+не только в коде: приложений может стать несколько, база одна.
+
+## Как это обновляется само
+
+Крон на Netlify Scheduled Functions, раз в 15 минут, **две фазы за тик**:
+
+1. забрать результаты прогонов, запущенных прошлым тиком;
+2. запустить новый батч — и **ничего не ждать**.
+
+Ждать нельзя: прогон Apify идёт 14–19 секунд, а функции Netlify отпущено 10.
+Один вызов Apify на весь батч, но по строке `sync_runs` на каждый рилс.
+Частота опроса адаптивная — свежий рилс опрашивается чаще, старый реже.
+
+Размер батча выбран **замером**, а не на глаз: при десяти тик занимал 6169 мс,
+при пяти — 4640 мс. Числа и метод в
+[плане среза 7](docs/superpowers/plans/2026-08-24-sync.md).
+
+### Бюджет Apify — жёсткое ограничение
+
+Бесплатный тариф это ≈1850 синхронизаций в месяц, и выйти за него значит
+провалить условие задачи. Держат три независимых предохранителя:
+
+- часовой троттлинг на паре `(user_id, shortcode)` — переживает удаление рилса,
+  поэтому «удалил → вставил ту же ссылку» не обходит лимит;
+- не больше пяти обновлений в минуту на пользователя;
+- месячный `tryReserve` — проверка и инкремент **одним** запросом, чтобы два
+  параллельных добавления не прочитали одно и то же число.
+
+Разработка идёт на фикстурах (`APIFY_MOCK=1`), живые вызовы — осознанно.
+На момент сдачи потрачено 11 из 1500.
+
+## Запуск локально
 
 ```bash
+npm install
+cp .env.example .env.local   # заполнить DATABASE_URL, JWT_SECRET, APIFY_TOKEN
+npm run db:migrate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+С `APIFY_MOCK=1` сеть и бюджет не тратятся: данные берутся из
+[`fixtures/apify/`](fixtures/apify/).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Тесты
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm test          # 294 юнит-теста: чистые функции, без базы и сети
+npm run test:db   # 129 интеграционных против живой базы Neon
+npm run lint
+npm run build
+```
 
-## Learn More
+Плюс сквозные проверки против запущенного дев-сервера — они смотрят на
+настоящие коды ответов и русские тексты ошибок, а не на моки:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run e2e:feed        # 23 проверки
+npm run e2e:dashboard   # 34 проверки
+npm run e2e:cron        # 18 проверок
+npm run verify:prod     # прод: живой Apify, обложки, sharp на Linux
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Интеграционные вынесены в отдельный конфиг намеренно: им нужен `.env.local`,
+а юнит-тестам он не нужен и не должен быть. Если тест на чистую функцию
+требует строку подключения — зависимости протекли туда, где им не место.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Чего сознательно нет
 
-## Deploy on Vercel
+Честнее назвать самому, чем оставить на «не заметят»:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Загрузка аватара файлом** — только инициалы. Настоящая загрузка потребовала
+  бы миграции, маршрута приёма, маршрута отдачи и валидации чужого файла;
+  для задания это не тот размен.
+- **Отзыв сессий при смене пароля.** Сессия — подписанный JWT без серверного
+  хранилища, отзывать нечем. В интерфейсе обратного не обещаем.
+- **Счётчик расхода Apify в интерфейсе.** Плашка «лимит исчерпан» есть, а
+  число потраченного блогеру ничего не говорит — оно нужно админу, чей раздел
+  в задание не входит.
+- **Экспорт в CSV и анимация появления карточек.** Первое — не про
+  «очеловеченность», второго не хватило бы на оправдание лишней библиотеки
+  в бандле.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Документы
+
+- [`PLAN.md`](PLAN.md) — спецификация: что строим, почему именно так, разбор ТЗ,
+  расчёт бесплатных тарифов до первой строчки кода.
+- [`AGENTS.md`](AGENTS.md) — рабочие заметки: состояние, конвенции и таблица
+  граблей, каждая из которых стоила времени.
+- [`docs/superpowers/plans/`](docs/superpowers/plans/) — планы исполнения по
+  срезам, с замерами и разбором отклонений.

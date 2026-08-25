@@ -32,9 +32,17 @@ if (!email) {
   process.exit(1)
 }
 
-if (!/@example\.(invalid|test)$/.test(email)) {
-  console.error(`Отказываюсь: «${email}» не тестовый адрес.`)
-  console.error('База общая с продом — сеять историю можно только на @example.invalid или @example.test.')
+// Демо-кабинет — законная цель для сидов наравне с тестовыми адресами: он
+// для того и заведён, чтобы его показывали. Сверяемся с `DEMO_EMAIL`, а не
+// добавляем ещё один домен в регулярку: так список разрешённых адресов
+// остаётся ровно один и лежит в окружении, а не размазан по скриптам.
+const demoEmail = process.env.DEMO_EMAIL?.trim().toLowerCase()
+const isDemo = Boolean(demoEmail) && email.trim().toLowerCase() === demoEmail
+
+if (!isDemo && !/@example\.(invalid|test)$/.test(email)) {
+  console.error(`Отказываюсь: «${email}» не тестовый адрес и не DEMO_EMAIL.`)
+  console.error('База общая с продом — сеять историю можно только на @example.invalid,')
+  console.error('@example.test или на кабинет из DEMO_EMAIL.')
   process.exit(1)
 }
 
