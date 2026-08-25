@@ -25,7 +25,7 @@ import dynamic from 'next/dynamic'
 function ChartPlaceholder({ height }: { height: string }) {
   return (
     <div
-      className={`${height} w-full animate-pulse rounded-xl bg-black/5`}
+      className={`${height} w-full animate-pulse rounded-xl bg-[var(--chip)]`}
       // Заглушка — не контент. Скринридеру сообщать о ней нечего.
       aria-hidden
     />

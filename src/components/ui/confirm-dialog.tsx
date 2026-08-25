@@ -47,14 +47,14 @@ export function ConfirmDialog({ open, title, text, confirmLabel, onConfirm, onCa
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm hover:bg-black/5"
+            className="rounded-xl border border-[var(--border)] px-4 py-2 text-sm hover:bg-[var(--chip)]"
           >
             Отмена
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-xl px-4 py-2 text-sm font-medium text-white"
+            className="rounded-xl px-4 py-2 text-sm font-medium text-[var(--on-ink)]"
             style={{ background: 'var(--down)' }}
           >
             {confirmLabel}

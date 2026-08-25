@@ -21,7 +21,7 @@ const OPTIONS: { value: TimeseriesRange; label: string; full: string }[] = [
 
 export function RangeSwitch({ current }: { current: TimeseriesRange }) {
   return (
-    <div className="flex items-center gap-1 rounded-full bg-black/5 p-0.5" role="group" aria-label="Диапазон графика">
+    <div className="flex items-center gap-1 rounded-full bg-[var(--chip)] p-0.5" role="group" aria-label="Диапазон графика">
       {OPTIONS.map((option) => {
         const active = option.value === current
 

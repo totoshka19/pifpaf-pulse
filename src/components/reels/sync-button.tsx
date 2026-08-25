@@ -50,7 +50,7 @@ export function SyncButton({ reelId, disabled }: { reelId: string; disabled?: bo
         type="button"
         onClick={sync}
         disabled={busy || disabled}
-        className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+        className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--on-ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
       >
         {busy ? 'Обновляем…' : 'Обновить'}
       </button>

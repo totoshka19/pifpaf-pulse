@@ -62,7 +62,7 @@ export function PostingTimeChart({ grid }: { grid: HeatmapRow[] }) {
                       onMouseLeave={() => setHovered(null)}
                       onFocus={() => setHovered(key)}
                       onBlur={() => setHovered(null)}
-                      className="h-6 flex-1 rounded-[3px] border border-black/5"
+                      className="h-6 flex-1 rounded-[3px] border border-[var(--border)]"
                       style={{
                         // Прозрачность считается из intensity: чем выше
                         // средние просмотры слота, тем плотнее заливка.

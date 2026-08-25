@@ -53,7 +53,7 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
 
         {card.growth && (
           <span
-            className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[11px] font-medium text-white"
+            className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[11px] font-medium text-[var(--on-ink)]"
             style={{ background: card.growth.direction === 'up' ? 'var(--up)' : 'var(--down)' }}
             title="Прирост просмотров за 7 дней"
           >
@@ -62,8 +62,8 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
         )}
 
         {busy && (
-          <div className="absolute inset-0 flex items-end rounded-[var(--radius)] bg-white/60 p-3 backdrop-blur-[1px]">
-            <span className="animate-pulse rounded-full bg-white px-2 py-1 text-[11px] shadow-[var(--shadow)]">
+          <div className="absolute inset-0 flex items-end rounded-[var(--radius)] bg-[var(--surface-2)] p-3 backdrop-blur-[1px]">
+            <span className="animate-pulse rounded-full bg-[var(--surface)] px-2 py-1 text-[11px] shadow-[var(--shadow)]">
               {card.message}
             </span>
           </div>
@@ -90,7 +90,7 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
           <button
             type="button"
             onClick={() => onSync(card.id)}
-            className="rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs hover:bg-[var(--accent-soft)]"
+            className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs hover:bg-[var(--accent-soft)]"
           >
             {card.canRetry ? 'Повторить' : 'Обновить'}
           </button>
@@ -100,7 +100,7 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
           href={card.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs hover:bg-[var(--accent-soft)]"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs hover:bg-[var(--accent-soft)]"
         >
           В Instagram
         </a>
@@ -108,7 +108,7 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
         <button
           type="button"
           onClick={() => onDelete(card.id)}
-          className="rounded-lg border border-[var(--border)] bg-white px-2 py-1 text-xs hover:bg-[var(--down)]/10"
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs hover:bg-[var(--down)]/10"
         >
           Удалить
         </button>

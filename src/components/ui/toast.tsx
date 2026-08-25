@@ -42,7 +42,7 @@ export function ToastStack({ toasts }: { toasts: Toast[] }) {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="rounded-xl px-4 py-2 text-sm text-white shadow-[var(--shadow)]"
+          className="rounded-xl px-4 py-2 text-sm text-[var(--on-ink)] shadow-[var(--shadow)]"
           style={{ background: toast.kind === 'error' ? 'var(--down)' : 'var(--ink)' }}
         >
           {toast.text}

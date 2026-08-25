@@ -26,7 +26,7 @@ export function ReelsTable({ cards, highlighted, sort, onSort, onSync, onDelete 
     // Горизонтальная прокрутка — единственный честный способ показать девять
     // колонок на экране в 375 px. Схлопывать таблицу в карточки бессмысленно:
     // тогда это просто вторая сетка.
-    <div className="overflow-x-auto rounded-[var(--radius)] border border-[var(--border)] bg-white">
+    <div className="overflow-x-auto rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)]">
       <table className="w-full min-w-[720px] border-collapse text-sm">
         <thead className="bg-[var(--accent-soft)]/40 text-left text-xs text-[var(--muted)]">
           <tr>

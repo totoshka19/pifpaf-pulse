@@ -78,8 +78,8 @@ export default async function DashboardPage({ searchParams }: PageProps<'/app'>)
   // одно объяснение с кнопкой — как начало работы.
   if (!hasReels) {
     return (
-      <div className="flex flex-col items-center gap-4 rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-white/50 px-6 py-16 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-[var(--accent-soft)] to-white text-3xl shadow-[var(--shadow)]">
+      <div className="flex flex-col items-center gap-4 rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-6 py-16 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-[var(--accent-soft)] to-[var(--surface)] text-3xl shadow-[var(--shadow)]">
           📈
         </div>
 
@@ -93,7 +93,7 @@ export default async function DashboardPage({ searchParams }: PageProps<'/app'>)
 
         <Link
           href="/app/reels"
-          className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+          className="rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--on-ink)] transition-opacity hover:opacity-90"
         >
           Добавить первый рилс
         </Link>
@@ -146,7 +146,7 @@ export default async function DashboardPage({ searchParams }: PageProps<'/app'>)
         {enoughForHeatmap ? (
           <PostingTimeChart grid={toPostingHeatmap(postingTime)} />
         ) : (
-          <p className="rounded-xl border border-dashed border-[var(--border)] bg-white/50 px-4 py-8 text-center text-sm text-[var(--muted)]">
+          <p className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-8 text-center text-sm text-[var(--muted)]">
             Пока мало данных: график строится по {datedReels}{' '}
             {plural(datedReels, ['рилсу', 'рилсам', 'рилсам'])}. Нужно хотя бы{' '}
             {MIN_REELS_FOR_HEATMAP} — иначе это не «лучшее время», а просто

@@ -37,7 +37,7 @@ export default function NotFound() {
       <div className="flex flex-wrap items-center gap-3">
         <Link
           href="/app/reels"
-          className="rounded-[var(--radius)] bg-[var(--ink)] px-6 py-3 font-medium text-white transition hover:opacity-90"
+          className="rounded-[var(--radius)] bg-[var(--ink)] px-6 py-3 font-medium text-[var(--on-ink)] transition hover:opacity-90"
         >
           К ленте
         </Link>

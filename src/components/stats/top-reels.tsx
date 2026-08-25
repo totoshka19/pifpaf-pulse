@@ -48,7 +48,7 @@ export function TopReels({ rows, now }: { rows: ReelListRow[]; now: number }) {
                   // Место в тройке. aria-hidden: порядок уже несёт <ol>,
                   // и скринридер сам скажет «список из трёх, элемент один».
                   aria-hidden
-                  className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[11px] font-semibold text-white"
+                  className="absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[11px] font-semibold text-[var(--on-ink)]"
                 >
                   {index + 1}
                 </span>

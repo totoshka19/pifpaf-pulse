@@ -160,7 +160,7 @@ export default async function ReelPage({ params }: PageProps<'/app/reels/[id]'>)
         {points.length === 1 ? (
           // Одна точка — не график. Рисовать по ней линию значит выдумывать
           // динамику, которой ещё не существует.
-          <p className="rounded-xl border border-dashed border-[var(--border)] bg-white/50 px-4 py-8 text-center text-sm text-[var(--muted)]">
+          <p className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-8 text-center text-sm text-[var(--muted)]">
             Данных пока мало: первый замер сделан{' '}
             {formatExactMsk(snapshots[0].capturedAt)}. Следующий — по расписанию,
             график появится после него.

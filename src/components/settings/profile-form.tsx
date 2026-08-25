@@ -110,7 +110,7 @@ export function ProfileForm({
         <button
           type="submit"
           disabled={busy}
-          className="self-start rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="self-start rounded-xl bg-[var(--ink)] px-4 py-2 text-sm font-medium text-[var(--on-ink)] transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {busy ? 'Сохраняем…' : 'Сохранить'}
         </button>

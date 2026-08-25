@@ -30,7 +30,7 @@ type Props = {
 }
 
 const select =
-  'rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]'
+  'rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]'
 
 export function FeedControls({ state, onChange, total, shown }: Props) {
   const patch = (part: Partial<FeedState>) => onChange({ ...state, ...part })
@@ -100,7 +100,7 @@ export function FeedControls({ state, onChange, total, shown }: Props) {
             скринридером как один выбор из двух, а не два независимых действия.
             Стрелки и roving tabIndex у кнопок ниже — ручная реализация APG
             radio pattern, роль сама по себе их не даёт (см. комментарий выше). */}
-        <div role="radiogroup" aria-label="Вид ленты" className="flex rounded-xl bg-white p-1">
+        <div role="radiogroup" aria-label="Вид ленты" className="flex rounded-xl bg-[var(--surface)] p-1">
           {VIEWS.map((item, index) => (
             <button
               key={item.value}

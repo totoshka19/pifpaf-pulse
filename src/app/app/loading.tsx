@@ -14,19 +14,19 @@ export default function Loading() {
   return (
     <div className="flex animate-pulse flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <div className="h-8 w-40 rounded-lg bg-white/60" />
-        <div className="h-4 w-64 rounded bg-white/60" />
+        <div className="h-8 w-40 rounded-lg bg-[var(--surface-2)]" />
+        <div className="h-4 w-64 rounded bg-[var(--surface-2)]" />
       </div>
 
       {/* Строка KPI: пять плиток, на узком экране в два столбца. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {Array.from({ length: 5 }, (_, i) => (
-          <div key={i} className="h-24 rounded-[var(--radius)] bg-white/60" />
+          <div key={i} className="h-24 rounded-[var(--radius)] bg-[var(--surface-2)]" />
         ))}
       </div>
 
-      <div className="h-72 rounded-[var(--radius)] bg-white/60" />
-      <div className="h-72 rounded-[var(--radius)] bg-white/60" />
+      <div className="h-72 rounded-[var(--radius)] bg-[var(--surface-2)]" />
+      <div className="h-72 rounded-[var(--radius)] bg-[var(--surface-2)]" />
     </div>
   )
 }

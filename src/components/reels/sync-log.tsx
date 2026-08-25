@@ -65,7 +65,7 @@ export function SyncLog({ runs, now }: { runs: DetailRun[]; now: number }) {
 
             {run.triggeredBy === 'cron' && (
               <span
-                className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] text-[var(--muted)]"
+                className="rounded-full bg-[var(--chip)] px-2 py-0.5 text-[11px] text-[var(--muted)]"
                 title="Запущено расписанием, а не вручную"
               >
                 по расписанию

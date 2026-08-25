@@ -97,7 +97,7 @@ export function AddReelForm({ onAdded, onDuplicate, onError }: Props) {
   return (
     <form
       onSubmit={submit}
-      className="flex flex-col gap-2 rounded-[var(--radius)] bg-white p-3 shadow-[var(--shadow)]"
+      className="flex flex-col gap-2 rounded-[var(--radius)] bg-[var(--surface)] p-3 shadow-[var(--shadow)]"
     >
       <div className="flex flex-wrap gap-2">
         <input
@@ -132,7 +132,7 @@ export function AddReelForm({ onAdded, onDuplicate, onError }: Props) {
         <button
           type="submit"
           disabled={busy}
-          className="rounded-xl bg-[var(--ink)] px-6 py-3 font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+          className="rounded-xl bg-[var(--ink)] px-6 py-3 font-medium text-[var(--on-ink)] transition hover:opacity-90 disabled:opacity-50"
         >
           {busy ? 'Добавляем…' : 'Добавить'}
         </button>

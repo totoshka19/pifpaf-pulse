@@ -48,7 +48,7 @@ export function AppNav({ className }: { className?: string }) {
                 className={`block rounded-full px-3 py-1.5 text-sm transition-colors ${
                   active
                     ? 'bg-[var(--accent-soft)] font-medium text-[var(--accent)]'
-                    : 'text-[var(--muted)] hover:bg-black/5 hover:text-[var(--ink)]'
+                    : 'text-[var(--muted)] hover:bg-[var(--chip)] hover:text-[var(--ink)]'
                 }`}
               >
                 {link.label}

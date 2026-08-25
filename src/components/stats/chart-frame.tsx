@@ -38,7 +38,7 @@ export function ChartFrame({
       </div>
 
       {empty ? (
-        <p className="rounded-xl border border-dashed border-[var(--border)] bg-white/50 px-4 py-10 text-center text-sm text-[var(--muted)]">
+        <p className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-4 py-10 text-center text-sm text-[var(--muted)]">
           {emptyText}
         </p>
       ) : (

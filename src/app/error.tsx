@@ -51,7 +51,7 @@ export default function Error({
         <button
           type="button"
           onClick={reset}
-          className="rounded-[var(--radius)] bg-[var(--ink)] px-6 py-3 font-medium text-white transition hover:opacity-90"
+          className="rounded-[var(--radius)] bg-[var(--ink)] px-6 py-3 font-medium text-[var(--on-ink)] transition hover:opacity-90"
         >
           Попробовать снова
         </button>

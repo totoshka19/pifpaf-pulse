@@ -69,7 +69,7 @@ function AuthForm() {
             placeholder="Как тебя зовут"
             autoComplete="name"
             required
-            className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-black/40"
+            className="rounded-xl border border-[var(--border)] px-4 py-3 outline-none focus:border-[var(--accent)]"
           />
         )}
 
@@ -79,7 +79,7 @@ function AuthForm() {
           placeholder="Почта"
           autoComplete="email"
           required
-          className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-black/40"
+          className="rounded-xl border border-[var(--border)] px-4 py-3 outline-none focus:border-[var(--accent)]"
         />
 
         <input
@@ -88,11 +88,11 @@ function AuthForm() {
           placeholder="Пароль"
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           required
-          className="rounded-xl border border-black/10 px-4 py-3 outline-none focus:border-black/40"
+          className="rounded-xl border border-[var(--border)] px-4 py-3 outline-none focus:border-[var(--accent)]"
         />
 
         {error && (
-          <p role="alert" className="text-sm text-red-600">
+          <p role="alert" className="text-sm text-[var(--down)]">
             {error}
           </p>
         )}
@@ -100,7 +100,7 @@ function AuthForm() {
         <button
           type="submit"
           disabled={busy}
-          className="rounded-xl bg-black px-4 py-3 font-medium text-white disabled:opacity-50"
+          className="rounded-xl bg-[var(--ink)] px-4 py-3 font-medium text-[var(--on-ink)] disabled:opacity-50"
         >
           {busy ? 'Секунду…' : mode === 'login' ? 'Войти' : 'Создать кабинет'}
         </button>

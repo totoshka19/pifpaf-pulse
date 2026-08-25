@@ -6,8 +6,8 @@
  */
 export function EmptyState() {
   return (
-    <div className="flex flex-col items-center gap-4 rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-white/50 px-6 py-16 text-center">
-      <div className="flex h-20 w-14 items-center justify-center rounded-xl bg-linear-to-br from-[var(--accent-soft)] to-white text-2xl shadow-[var(--shadow)]">
+    <div className="flex flex-col items-center gap-4 rounded-[var(--radius)] border border-dashed border-[var(--border)] bg-[var(--surface-2)] px-6 py-16 text-center">
+      <div className="flex h-20 w-14 items-center justify-center rounded-xl bg-linear-to-br from-[var(--accent-soft)] to-[var(--surface)] text-2xl shadow-[var(--shadow)]">
         🎬
       </div>
 
