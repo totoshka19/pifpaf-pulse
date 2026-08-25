@@ -22,7 +22,8 @@
     "verify:prod": "node --env-file=.env.local scripts/verify-prod.mjs",
     "thumbs:backfill": "tsx --env-file=.env.local scripts/backfill-thumbnails.mts",
     "seed:demo": "tsx --env-file=.env.local scripts/seed-demo-history.mts",
-    "e2e:dashboard": "node scripts/e2e-dashboard.mjs"
+    "e2e:dashboard": "node scripts/e2e-dashboard.mjs",
+    "e2e:cron": "node --env-file=.env.local scripts/e2e-cron.mjs"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
