@@ -28,9 +28,13 @@ export function ReelCard({ card, highlighted = false, priority = false, onSync, 
             никуда не делась — она отдельной кнопкой ниже и на самом экране:
             это было единственное назначение клика до среза 6, и молча
             подменить его значило бы отобрать привычное действие. */}
+        {/* Подъёма карточки при наведении НЕТ намеренно: приближается сама
+            обложка (`group-hover:scale-105` у `<img>` в `reel-cover.tsx`).
+            Подъём сдвигал соседей по сетке и спорил с зумом — два движения
+            на один жест читаются как дёрганье. */}
         <Link
           href={`/app/reels/${card.id}`}
-          className="block transition-transform duration-200 hover:-translate-y-0.5"
+          className="block"
           title={`Открыть аналитику: ${card.caption}`}
         >
           <ReelCover
