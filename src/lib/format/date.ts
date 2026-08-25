@@ -84,6 +84,21 @@ export function formatDayMsk(date: Date | null, timeZone = MOSCOW_TZ): string {
   return `${p.day} ${MONTHS_SHORT[p.month - 1]}`
 }
 
+/**
+ * «1 сентября» — для даты внутри живой фразы.
+ *
+ * Месяц берётся из `MONTHS`, а он в родительном падеже: строка встаёт в
+ * предложение вроде «счётчик обнулится 1 сентября», где именительный
+ * («1 сентябрь») режет глаз. Год не показываем намеренно — фраза всегда
+ * про ближайшее будущее, и год в ней только шум.
+ */
+export function formatDayMonthMsk(date: Date | null, timeZone = MOSCOW_TZ): string {
+  if (!isUsable(date)) return NO_DATA
+
+  const p = partsIn(date, timeZone)
+  return `${p.day} ${MONTHS[p.month - 1]}`
+}
+
 /** «24 авг, 19:30» — подпись оси графика роста, где важен час. */
 export function formatDayHourMsk(date: Date | null, timeZone = MOSCOW_TZ): string {
   if (!isUsable(date)) return NO_DATA

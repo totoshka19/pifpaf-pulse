@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { NO_DATA } from './number'
 import {
   formatDayHourMsk,
+  formatDayMonthMsk,
   formatDayMsk,
   formatExactMsk,
   formatIsoDayShort,
@@ -142,5 +143,22 @@ describe('formatDayHourMsk — подпись оси графика роста',
 
   it('нет даты — прочерк', () => {
     expect(formatDayHourMsk(null)).toBe(NO_DATA)
+  })
+})
+
+describe('formatDayMonthMsk — день и месяц словом', () => {
+  it('месяц в родительном падеже, как в живой фразе', () => {
+    // «1 сентября», а не «1 сентябрь»: строка идёт внутрь предложения
+    // «счётчик обнулится 1 сентября», и именительный падеж там режет глаз.
+    expect(formatDayMonthMsk(new Date('2026-09-01T00:00:00+03:00'))).toBe('1 сентября')
+  })
+
+  it('считает по московскому календарю, а не по UTC', () => {
+    // 21:30 UTC 31 августа — это уже 00:30 первого сентября в Москве.
+    expect(formatDayMonthMsk(new Date('2026-08-31T21:30:00Z'))).toBe('1 сентября')
+  })
+
+  it('нет даты — прочерк', () => {
+    expect(formatDayMonthMsk(null)).toBe(NO_DATA)
   })
 })

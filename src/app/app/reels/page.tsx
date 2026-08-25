@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { listReels } from '@/db/queries/list-reels'
 import { requireSession } from '@/lib/auth/require-session'
+import { BudgetBanner } from '@/components/feed/budget-banner'
 import { ReelsFeed } from '@/components/feed/reels-feed'
 
 export const metadata: Metadata = { title: 'Лента' }
@@ -19,6 +20,11 @@ export default async function ReelsPage() {
   // Серверный компонент вызывается один раз за запрос и не мемоизируется React
   // Compiler. Date.now() здесь и есть лекарство от хайдрейшн-мисматча, а не его
   // причина: см. комментарий в <ReelsFeed>.
-  // eslint-disable-next-line react-hooks/purity
-  return <ReelsFeed initialRows={rows} serverNow={Date.now()} />
+  return (
+    <>
+      <BudgetBanner />
+      {/* eslint-disable-next-line react-hooks/purity */}
+      <ReelsFeed initialRows={rows} serverNow={Date.now()} />
+    </>
+  )
 }
