@@ -26,6 +26,38 @@ const API = 'https://api.apify.com/v2'
 /** Префикс отличает поддельный идентификатор прогона от настоящего. */
 const MOCK_PREFIX = 'mock:'
 
+/**
+ * Зарезервированные шорткоды мока — единственный способ интеграционных
+ * тестов вызвать четыре ветки обработки отказов Apify (startRun бросает,
+ * getRun бросает, прогон FAILED, прогон без datasetId) без обращения к
+ * живому Apify и без первого `vi.mock` в интеграционном наборе проекта.
+ *
+ * Живут именно здесь, а не в тестовом хелпере: этот модуль и так
+ * единственное место, где решается, что вернёт Apify в мок-режиме —
+ * тестовый хелпер такого решения не принимает, только просит. Действуют
+ * ТОЛЬКО внутри веток `isMock()`; боевой путь (реальный `fetch` к
+ * `api.apify.com`) их не видит и не проверяет вообще.
+ *
+ * Формат — двойное подчёркивание с обеих сторон. Настоящие шорткоды
+ * Instagram — строки 5–20 символов из base64url-алфавита (A–Za–z0–9_-),
+ * и хотя технически `_` в этот алфавит входит, шорткод вида
+ * `__mock_throw_start__` как случайное совпадение практически не
+ * встречается — маркер очевидно тестовый на вид.
+ *
+ * `MOCK_RUN_FAILED` намеренно с НЕпустым `datasetId`, а `MOCK_NO_DATASET`
+ * намеренно со статусом `SUCCEEDED`: в `collectFinishedRuns`
+ * (src/lib/sync/run-cron.ts) обе причины проверяются одним условием
+ * `handle.status === 'FAILED' || !handle.datasetId` — если бы оба
+ * маркера били сразу по обеим причинам, мутация одной половины условия
+ * осталась бы незамеченной тестом на другую половину.
+ */
+// Экспортированы, чтобы интеграционные тесты не дублировали литералы —
+// единственный источник правды об их написании остаётся здесь.
+export const MOCK_THROW_START = '__mock_throw_start__'
+export const MOCK_THROW_GETRUN = '__mock_throw_getrun__'
+export const MOCK_RUN_FAILED = '__mock_run_failed__'
+export const MOCK_NO_DATASET = '__mock_no_dataset__'
+
 export function isMock(): boolean {
   if (process.env.APIFY_MOCK === '1') return true
 
@@ -67,7 +99,14 @@ function shortcodesFrom(urls: string[]): string[] {
 
 export async function startRun(urls: string[]): Promise<RunHandle> {
   if (isMock()) {
-    const id = MOCK_PREFIX + shortcodesFrom(urls).join(',')
+    const codes = shortcodesFrom(urls)
+
+    // Маркер отказа запуска — см. доккомент у объявлений выше.
+    if (codes.includes(MOCK_THROW_START)) {
+      throw new Error(`mock: startRun настроен на отказ маркером ${MOCK_THROW_START}`)
+    }
+
+    const id = MOCK_PREFIX + codes.join(',')
     return { runId: id, datasetId: id, status: 'SUCCEEDED' }
   }
 
@@ -97,6 +136,20 @@ export async function startRun(urls: string[]): Promise<RunHandle> {
 
 export async function getRun(runId: string): Promise<RunHandle> {
   if (runId.startsWith(MOCK_PREFIX)) {
+    const codes = runId.slice(MOCK_PREFIX.length).split(',')
+
+    // Три маркера отказа — см. доккомент у объявлений выше. Проверка ДО
+    // штатного возврата, поведение вне маркеров ниже не меняется ни на строку.
+    if (codes.includes(MOCK_THROW_GETRUN)) {
+      throw new Error(`mock: getRun настроен на отказ маркером ${MOCK_THROW_GETRUN}`)
+    }
+    if (codes.includes(MOCK_RUN_FAILED)) {
+      return { runId, datasetId: runId, status: 'FAILED' }
+    }
+    if (codes.includes(MOCK_NO_DATASET)) {
+      return { runId, datasetId: null, status: 'SUCCEEDED' }
+    }
+
     return { runId, datasetId: runId, status: 'SUCCEEDED' }
   }
 

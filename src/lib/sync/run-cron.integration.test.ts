@@ -3,6 +3,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { db, reels, syncRuns, users } from '@/db'
 import { readThumbnail } from '@/db/queries/thumbnails'
 import {
+  MOCK_NO_DATASET,
+  MOCK_RUN_FAILED,
+  MOCK_THROW_GETRUN,
+  MOCK_THROW_START,
+} from '@/lib/apify/client'
+import {
   collectFinishedRuns,
   FAILED_RETRY_MS,
   runCronTick,
@@ -440,5 +446,91 @@ describe('runCronTick — фаза запуска', () => {
 
     expect(report.started).toBe(0)
     expect(report.skipped).toBeNull()
+  })
+})
+
+describe('run-cron — ветки отказа Apify (раунд правок 2/5)', () => {
+  // До этого раунда ни одна из четырёх веток обработки отказа Apify не
+  // выполнялась НИ РАЗУ ни одним тестом файла: мок в штатном режиме
+  // всегда отвечает успехом, а живой Apify тесты не трогают. Именно эти
+  // ветки решают, потеряет ли сервис данные и сожжёт ли бюджет при
+  // реальном отказе Apify (отозванный токен, переименованный актор,
+  // сетевой сбой) — самом вероятном классе сбоя из всех. Зарезервированные
+  // шорткоды-маркеры (src/lib/apify/client.ts, MOCK_THROW_START и
+  // остальные) включают эти ветки без обращения к живому Apify и без
+  // первого `vi.mock` в интеграционном наборе проекта.
+
+  it('startRun бросает исключение → sync_runs закрыт failed, next_sync_at сдвинут, syncStatus не тронут', async () => {
+    // Явный слив очереди перед сидом: этот сценарий чувствителен к тому,
+    // что в due-батч попадёт РОВНО наш маркерный рилс — иначе марker может
+    // утонуть среди того, что осталось от соседних describe-блоков этого
+    // файла (общая база, общий userId, общий частичный индекс idx_reels_due).
+    for (let i = 0; i < 5; i++) await runCronTick()
+
+    const [reel] = await db
+      .insert(reels)
+      .values({
+        userId,
+        shortcode: MOCK_THROW_START,
+        url: `https://www.instagram.com/reel/${MOCK_THROW_START}/`,
+        syncStatus: 'ok',
+        nextSyncAt: new Date(Date.now() - 30 * 60_000),
+      })
+      .returning({ id: reels.id })
+
+    const before = Date.now()
+    const report = await runCronTick()
+    expect(report.started).toBe(0)
+
+    const runs = await db.select().from(syncRuns).where(eq(syncRuns.reelId, reel.id))
+    expect(runs).toHaveLength(1)
+    expect(runs[0].status).toBe('failed')
+    expect(runs[0].error).toMatch(/[а-яё]/i)
+
+    const [after] = await db.select().from(reels).where(eq(reels.id, reel.id))
+    // Находка 1 (раунд правок 1/5): syncStatus НЕ трогаем — данные рилса
+    // никуда не делись, мы просто не смогли сходить за свежими.
+    expect(after.syncStatus).toBe('ok')
+    expect(after.nextSyncAt!.getTime()).toBeGreaterThan(before + FAILED_RETRY_MS - 10_000)
+  })
+
+  it('getRun бросает исключение → прогон остаётся running, следующий тик сможет повторить', async () => {
+    const { reelId, runId } = await seedRunningReel(MOCK_THROW_GETRUN)
+
+    // Не должно бросить — catch в collectFinishedRuns обязан проглотить
+    // транзиентный отказ getRun и оставить прогон нетронутым.
+    await collectFinishedRuns()
+
+    const [run] = await db.select().from(syncRuns).where(eq(syncRuns.id, runId))
+    expect(run.status).toBe('running')
+
+    const [reel] = await db.select().from(reels).where(eq(reels.id, reelId))
+    expect(reel.syncStatus).toBe('pending')
+  })
+
+  it('прогон FAILED → sync_runs закрыт failed, рилс откатывается в failed', async () => {
+    const { reelId, runId } = await seedRunningReel(MOCK_RUN_FAILED)
+
+    await collectFinishedRuns()
+
+    const [run] = await db.select().from(syncRuns).where(eq(syncRuns.id, runId))
+    expect(run.status).toBe('failed')
+    expect(run.error).toMatch(/[а-яё]/i)
+
+    const [reel] = await db.select().from(reels).where(eq(reels.id, reelId))
+    expect(reel.syncStatus).toBe('failed')
+    expect(reel.syncError).toMatch(/[а-яё]/i)
+  })
+
+  it('прогон без datasetId → закрывается как failed, симметрично явному FAILED', async () => {
+    const { reelId, runId } = await seedRunningReel(MOCK_NO_DATASET)
+
+    await collectFinishedRuns()
+
+    const [run] = await db.select().from(syncRuns).where(eq(syncRuns.id, runId))
+    expect(run.status).toBe('failed')
+
+    const [reel] = await db.select().from(reels).where(eq(reels.id, reelId))
+    expect(reel.syncStatus).toBe('failed')
   })
 })
