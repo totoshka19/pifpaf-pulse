@@ -13,6 +13,11 @@ import { formatExactMsk, formatRelative } from '@/lib/format/date'
  * не отдаём — блогеру он ничего не говорит. А вот пометку показываем: во
  * время демонстрации молчание о том, что данные ненастоящие, читалось бы
  * как попытка выдать одно за другое.
+ *
+ * Про пометку «по расписанию». Она и есть видимое доказательство обещания
+ * «цифры обновляются сами»: строка, которую блогер точно не нажимал. Ручные
+ * прогоны остаются без пометки намеренно — помечать надо необычное, а
+ * «я нажал и оно пошло» объяснений не требует.
  */
 
 const STATUS: Record<string, { label: string; className: string }> = {
@@ -56,6 +61,15 @@ export function SyncLog({ runs, now }: { runs: DetailRun[]; now: number }) {
 
             {seconds !== null && (
               <span className="text-xs text-[var(--muted)]">{seconds} с</span>
+            )}
+
+            {run.triggeredBy === 'cron' && (
+              <span
+                className="rounded-full bg-black/5 px-2 py-0.5 text-[11px] text-[var(--muted)]"
+                title="Запущено расписанием, а не вручную"
+              >
+                по расписанию
+              </span>
             )}
 
             {run.isMock && (

@@ -13,6 +13,8 @@ export type DetailRun = {
   finishedAt: Date | null
   status: string
   error: string | null
+  /** Кто запустил: блогер кнопкой или расписание. */
+  triggeredBy: 'manual' | 'cron'
   /** Прогон был на фикстурах, а не на живом Apify. */
   isMock: boolean
 }
@@ -98,6 +100,7 @@ export async function reelDetail(userId: string, reelId: string): Promise<ReelDe
         finishedAt: syncRuns.finishedAt,
         status: syncRuns.status,
         error: syncRuns.error,
+        triggeredBy: syncRuns.triggeredBy,
         apifyRunId: syncRuns.apifyRunId,
       })
       .from(syncRuns)

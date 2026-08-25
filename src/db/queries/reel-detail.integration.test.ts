@@ -195,4 +195,25 @@ describe('reelDetail — лог синхронизаций', () => {
 
     expect(detail!.runs).toEqual([])
   })
+
+  it('различает ручной прогон и прогон по расписанию', async () => {
+    await db.insert(syncRuns).values({
+      reelId: ids.mine,
+      userId: ids.owner,
+      shortcode: 'DetailMine',
+      triggeredBy: 'cron',
+      status: 'succeeded',
+      apifyRunId: 'mock:ccc',
+      startedAt: ago(2),
+      finishedAt: ago(2),
+    })
+
+    const detail = await reelDetail(ids.owner, ids.mine)
+
+    // Три прогона, засеянных в beforeAll, идут без явного triggeredBy и
+    // получают дефолт 'manual'. Проверяются ОБЕ стороны: запрос, отдающий
+    // константу, а не колонку, покраснеет на одной из них.
+    expect(detail!.runs.some((r) => r.triggeredBy === 'cron')).toBe(true)
+    expect(detail!.runs.some((r) => r.triggeredBy === 'manual')).toBe(true)
+  })
 })
